@@ -1,0 +1,154 @@
+{
+  "title": "Dynamic Pricing Agent — AI Observability",
+  "uid": "pricing-agent-v2",
+  "tags": ["pricing", "ai-agent", "llm", "ecommerce"],
+  "timezone": "browser",
+  "refresh": "10s",
+  "schemaVersion": 38,
+  "panels": [
+
+    { "id": 100, "type": "text", "gridPos": {"h": 2, "w": 24, "x": 0, "y": 0},
+      "options": {"content": "## 🟢 ROW 1 — AGENT HEALTH — *Is the agent alive and running?*", "mode": "markdown"} },
+
+    { "id": 1, "title": "Agent Status (last run age)", "type": "stat",
+      "gridPos": {"h": 4, "w": 4, "x": 0, "y": 2},
+      "targets": [{"expr": "pricing_agent_last_run_age_seconds", "legendFormat": "Age"}],
+      "fieldConfig": {"defaults": {"unit": "s", "thresholds": {"mode": "absolute", "steps": [
+        {"color": "green", "value": 0}, {"color": "yellow", "value": 1800}, {"color": "red", "value": 7200}
+      ]}, "mappings": []}},
+      "options": {"colorMode": "background", "graphMode": "area", "reduceOptions": {"calcs": ["lastNotNull"]}}
+    },
+
+    { "id": 2, "title": "Total Runs", "type": "stat",
+      "gridPos": {"h": 4, "w": 3, "x": 4, "y": 2},
+      "targets": [{"expr": "sum(pricing_agent_runs_total)", "legendFormat": "Runs"}],
+      "fieldConfig": {"defaults": {"thresholds": {"steps": [{"color": "blue", "value": 0}]}}},
+      "options": {"colorMode": "background", "reduceOptions": {"calcs": ["lastNotNull"]}}
+    },
+
+    { "id": 3, "title": "Consecutive Failures", "type": "stat",
+      "gridPos": {"h": 4, "w": 3, "x": 7, "y": 2},
+      "targets": [{"expr": "pricing_agent_consecutive_failures_total", "legendFormat": "Failures"}],
+      "fieldConfig": {"defaults": {"thresholds": {"mode": "absolute", "steps": [
+        {"color": "green", "value": 0}, {"color": "yellow", "value": 1}, {"color": "red", "value": 3}
+      ]}}},
+      "options": {"colorMode": "background", "reduceOptions": {"calcs": ["lastNotNull"]}}
+    },
+
+    { "id": 4, "title": "Agent Run Duration (seconds)", "type": "timeseries",
+      "gridPos": {"h": 4, "w": 8, "x": 10, "y": 2},
+      "targets": [{"expr": "pricing_agent_run_duration_seconds_sum / pricing_agent_run_duration_seconds_count", "legendFormat": "Avg Duration"}],
+      "fieldConfig": {"defaults": {"unit": "s", "color": {"mode": "palette-classic"}}}
+    },
+
+    { "id": 5, "title": "Per-Phase Duration (p95)", "type": "bargauge",
+      "gridPos": {"h": 4, "w": 6, "x": 18, "y": 2},
+      "targets": [{"expr": "histogram_quantile(0.95, sum by(phase, le) (rate(pricing_agent_phase_duration_seconds_bucket[10m])))", "legendFormat": "{{phase}}"}],
+      "fieldConfig": {"defaults": {"unit": "s", "thresholds": {"steps": [{"color": "green", "value": 0}, {"color": "yellow", "value": 2}, {"color": "red", "value": 10}]}}},
+      "options": {"orientation": "horizontal", "reduceOptions": {"calcs": ["lastNotNull"]}}
+    },
+
+    { "id": 200, "type": "text", "gridPos": {"h": 2, "w": 24, "x": 0, "y": 6},
+      "options": {"content": "## 💰 ROW 2 — LLM ECONOMICS — *What is the agent spending?*", "mode": "markdown"} },
+
+    { "id": 6, "title": "Total LLM Cost (USD)", "type": "stat",
+      "gridPos": {"h": 4, "w": 4, "x": 0, "y": 8},
+      "targets": [{"expr": "sum(pricing_llm_cost_usd_total)", "legendFormat": "Cost"}],
+      "fieldConfig": {"defaults": {"unit": "currencyUSD", "decimals": 4, "thresholds": {"steps": [{"color": "green", "value": 0}, {"color": "yellow", "value": 1}, {"color": "red", "value": 10}]}}},
+      "options": {"colorMode": "background", "reduceOptions": {"calcs": ["lastNotNull"]}}
+    },
+
+    { "id": 7, "title": "Tokens Used (prompt vs completion)", "type": "timeseries",
+      "gridPos": {"h": 4, "w": 8, "x": 4, "y": 8},
+      "targets": [
+        {"expr": "rate(pricing_llm_tokens_total{type=\"prompt\"}[5m])", "legendFormat": "Prompt tokens/s"},
+        {"expr": "rate(pricing_llm_tokens_total{type=\"completion\"}[5m])", "legendFormat": "Completion tokens/s"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "short"}}
+    },
+
+    { "id": 8, "title": "LLM Latency (p50 / p95 / p99)", "type": "timeseries",
+      "gridPos": {"h": 4, "w": 8, "x": 12, "y": 8},
+      "targets": [
+        {"expr": "histogram_quantile(0.50, sum by(le) (rate(pricing_llm_request_duration_seconds_bucket[5m])))", "legendFormat": "p50"},
+        {"expr": "histogram_quantile(0.95, sum by(le) (rate(pricing_llm_request_duration_seconds_bucket[5m])))", "legendFormat": "p95"},
+        {"expr": "histogram_quantile(0.99, sum by(le) (rate(pricing_llm_request_duration_seconds_bucket[5m])))", "legendFormat": "p99"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "s"}}
+    },
+
+    { "id": 9, "title": "LLM Errors & Fallbacks", "type": "timeseries",
+      "gridPos": {"h": 4, "w": 4, "x": 20, "y": 8},
+      "targets": [
+        {"expr": "rate(pricing_llm_errors_total[5m])", "legendFormat": "Errors/s ({{error_type}})"},
+        {"expr": "rate(pricing_llm_fallback_total[5m])", "legendFormat": "Fallbacks/s"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "short", "color": {"fixedColor": "red", "mode": "fixed"}}}
+    },
+
+    { "id": 300, "type": "text", "gridPos": {"h": 2, "w": 24, "x": 0, "y": 12},
+      "options": {"content": "## 🎯 ROW 3 — DECISION QUALITY — *What is the agent deciding?*", "mode": "markdown"} },
+
+    { "id": 10, "title": "Strategy Distribution", "type": "piechart",
+      "gridPos": {"h": 6, "w": 5, "x": 0, "y": 14},
+      "targets": [{"expr": "sum by(strategy) (pricing_decision_strategy_total)", "legendFormat": "{{strategy}}"}],
+      "options": {"pieType": "donut", "legendDisplayMode": "table", "placement": "right"}
+    },
+
+    { "id": 11, "title": "Decisions: Increases vs Holds vs Decreases", "type": "timeseries",
+      "gridPos": {"h": 6, "w": 8, "x": 5, "y": 14},
+      "targets": [
+        {"expr": "rate(pricing_decision_strategy_total{direction=\"increase\"}[5m])", "legendFormat": "Increases"},
+        {"expr": "rate(pricing_decision_strategy_total{direction=\"hold\"}[5m])", "legendFormat": "Holds"},
+        {"expr": "rate(pricing_decision_strategy_total{direction=\"decrease\"}[5m])", "legendFormat": "Decreases"}
+      ]
+    },
+
+    { "id": 12, "title": "Confidence Score Distribution (heatmap)", "type": "heatmap",
+      "gridPos": {"h": 6, "w": 6, "x": 13, "y": 14},
+      "targets": [{"expr": "sum(rate(pricing_decision_confidence_bucket[5m])) by (le)", "legendFormat": "{{le}}", "format": "heatmap"}],
+      "options": {"calculate": false, "color": {"scheme": "Greens"}}
+    },
+
+    { "id": 13, "title": "Guardrail Triggers by Rule", "type": "timeseries",
+      "gridPos": {"h": 6, "w": 5, "x": 19, "y": 14},
+      "targets": [{"expr": "rate(pricing_guardrail_triggers_total[5m])", "legendFormat": "{{rule}}"}],
+      "fieldConfig": {"defaults": {"unit": "short"}}
+    },
+
+    { "id": 400, "type": "text", "gridPos": {"h": 2, "w": 24, "x": 0, "y": 20},
+      "options": {"content": "## 📈 ROW 4 — BUSINESS IMPACT — *Is it working?*", "mode": "markdown"} },
+
+    { "id": 14, "title": "Estimated Revenue Impact (USD)", "type": "stat",
+      "gridPos": {"h": 4, "w": 4, "x": 0, "y": 22},
+      "targets": [{"expr": "pricing_estimated_revenue_impact_usd", "legendFormat": "Impact"}],
+      "fieldConfig": {"defaults": {"unit": "currencyUSD", "thresholds": {"steps": [{"color": "red", "value": -100}, {"color": "yellow", "value": 0}, {"color": "green", "value": 100}]}}},
+      "options": {"colorMode": "background", "reduceOptions": {"calcs": ["lastNotNull"]}}
+    },
+
+    { "id": 15, "title": "Product Margin % (all products)", "type": "timeseries",
+      "gridPos": {"h": 4, "w": 8, "x": 4, "y": 22},
+      "targets": [{"expr": "pricing_product_margin_percent", "legendFormat": "{{product_name}}"}],
+      "fieldConfig": {"defaults": {"unit": "percent", "thresholds": {"steps": [{"color": "red", "value": 0}, {"color": "yellow", "value": 15}, {"color": "green", "value": 25}]}}}
+    },
+
+    { "id": 16, "title": "Competitor Price Gap % (positive = we are higher)", "type": "bargauge",
+      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 22},
+      "targets": [{"expr": "pricing_competitor_price_gap_percent", "legendFormat": "{{product_id}}"}],
+      "fieldConfig": {"defaults": {"unit": "percent", "thresholds": {"steps": [{"color": "green", "value": -20}, {"color": "yellow", "value": 0}, {"color": "red", "value": 15}]}}},
+      "options": {"orientation": "horizontal", "reduceOptions": {"calcs": ["lastNotNull"]}}
+    },
+
+    { "id": 17, "title": "Current Prices vs Inventory", "type": "table",
+      "gridPos": {"h": 4, "w": 6, "x": 18, "y": 22},
+      "targets": [
+        {"expr": "pricing_product_current_price_usd", "legendFormat": "{{product_name}}", "instant": true},
+        {"expr": "pricing_product_inventory_level", "legendFormat": "{{product_name}}", "instant": true}
+      ],
+      "options": {"sortBy": [{"displayName": "Value", "desc": true}]}
+    }
+
+  ],
+  "time": {"from": "now-1h", "to": "now"},
+  "timepicker": {}
+}

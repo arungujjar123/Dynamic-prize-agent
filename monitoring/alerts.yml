@@ -1,0 +1,103 @@
+groups:
+  - name: pricing_agent_health
+    rules:
+
+      # Agent hasn't run in 2+ hours
+      - alert: AgentStalled
+        expr: time() - pricing_agent_last_successful_run_timestamp > 7200
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Pricing agent stalled — no run in 2+ hours"
+          description: "Last successful run was {{ humanizeDuration $value }} ago."
+
+      # 3 or more consecutive failures
+      - alert: AgentConsecutiveFailures
+        expr: pricing_agent_consecutive_failures_total >= 3
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Pricing agent has {{ $value }} consecutive failures"
+
+      # LLM error rate above 20% over last 10 min
+      - alert: HighLLMErrorRate
+        expr: |
+          rate(pricing_llm_errors_total[10m]) /
+          rate(pricing_llm_requests_total[10m]) > 0.2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "LLM error rate is {{ $value | humanizePercentage }}"
+
+      # Agent falling back to cost-plus too often
+      - alert: HighFallbackRate
+        expr: rate(pricing_llm_fallback_total[15m]) > 0.3
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Agent is falling back to cost-plus pricing frequently"
+
+  - name: pricing_decision_quality
+    rules:
+
+      # Confidence staying low — model may need attention
+      - alert: LowDecisionConfidence
+        expr: |
+          histogram_quantile(0.5,
+            rate(pricing_decision_confidence_bucket[30m])
+          ) < 0.4
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Median decision confidence below 40%"
+
+      # Guardrails firing too often — bounds may be too tight
+      - alert: GuardrailsFiringTooOften
+        expr: rate(pricing_guardrail_triggers_total[15m]) > 1.0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Guardrails firing at {{ $value }}/s — pricing bounds may be too tight"
+          description: "Rule firing most: {{ $labels.rule }}"
+
+  - name: pricing_llm_economics
+    rules:
+
+      # LLM latency p95 over 10 seconds
+      - alert: SlowLLMResponse
+        expr: |
+          histogram_quantile(0.95,
+            rate(pricing_llm_request_duration_seconds_bucket[10m])
+          ) > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "LLM p95 latency is {{ $value | humanizeDuration }}"
+
+  - name: pricing_business
+    rules:
+
+      # A product's margin has dropped below 10%
+      - alert: ProductMarginTooLow
+        expr: pricing_product_margin_percent < 10
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Product {{ $labels.product_name }} margin is {{ $value }}%"
+
+      # Inventory critically low
+      - alert: CriticalInventory
+        expr: pricing_product_inventory_level < 5
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Product {{ $labels.product_name }} has only {{ $value }} units left"
