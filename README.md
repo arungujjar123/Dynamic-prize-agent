@@ -93,9 +93,13 @@ dynamic-pricing-agent/
 | `COMPETITIVE` | Normal stock, competitor prices available | ▼ 2–5% below lowest competitor |
 | `DEMAND_BASED` | demand_score 0.4–0.7, normal inventory | ↕ Tracks demand level |
 | `CLEARANCE` | Excess inventory or low sell-through | ▼ Price goes DOWN 5–15% |
-| `COST_PLUS` | LLM fallback only | = Cost × 1.40 |
+| `COST_PLUS` | Last resort / LLM fallback | = Cost × 1.40 (on LLM failure the current price is held) |
 
 > Strategy-direction consistency is **enforced in code** — if the LLM says SURGE but returns a lower price, the agent auto-corrects to +8%.
+
+**Guardrail order** (`backend/agents/guardrails.py`): velocity limit → `max_price` ceiling → hard floors (`min_price`, cost × (1 + margin)). The hard floors run last, so no other rule can push a price below them.
+
+> ⚠️ **Data sources:** demand signals (page views, cart adds, sell-through) are currently **simulated**, and Amazon.in/Flipkart usually block scraping, so competitor prices fall back to **simulated** INR values (`source: "simulated"`). Plug in real analytics and a scraping API before using this for live pricing.
 
 ---
 
@@ -116,7 +120,22 @@ SYNC_DATABASE_URL=postgresql://pricing_user:pricing_pass@localhost:5432/pricing_
 MIN_MARGIN_PERCENT=15           # Never price below this margin
 MAX_PRICE_CHANGE_VELOCITY=20    # Max % change per agent run
 PRICING_AGENT_INTERVAL_MINUTES=60  # How often scheduler runs
+
+# Security
+API_KEY=change-me               # Required as X-API-Key header on write endpoints (unset = open, dev only)
+ALLOWED_ORIGINS=https://your-frontend.example.com
 ```
+
+Write endpoints (`POST/PATCH /products`, `POST /agent/run`) require the `X-API-Key` header when `API_KEY` is set. The Streamlit app reads `API_KEY` and the React app reads `VITE_API_KEY` at build time — note that a key baked into a public frontend bundle is visible to anyone, so treat it as a basic gate, not real user auth.
+
+### 🧪 Tests
+
+```bash
+pip install -r requirements-dev.txt
+pytest -q
+```
+
+CI (`.github/workflows/ci.yml`) runs the backend tests and the React build on every push.
 
 ---
 
@@ -390,7 +409,7 @@ python demo_load.py 15    # 15 runs
 | `pricing_llm_tokens_total` | Counter | Tokens by type: prompt / completion |
 | `pricing_llm_cost_usd_total` | Counter | Estimated USD cost |
 | `pricing_llm_errors_total` | Counter | Errors by type: rate_limit / timeout / api_error |
-| `pricing_llm_fallback_total` | Counter | Times fell back to cost-plus |
+| `pricing_llm_fallback_total` | Counter | Times the LLM failed and the price was held |
 
 ### Pillar 3 — Decision Quality
 | Metric | Type | Description |
@@ -404,11 +423,11 @@ python demo_load.py 15    # 15 runs
 ### Pillar 4 — Business Impact
 | Metric | Type | Description |
 |---|---|---|
-| `pricing_product_current_price_usd` | Gauge | Live price per product |
+| `pricing_product_current_price_inr` | Gauge | Live price per product |
 | `pricing_product_margin_percent` | Gauge | Gross margin % per product |
 | `pricing_product_inventory_level` | Gauge | Inventory count per product |
 | `pricing_competitor_price_gap_percent` | Gauge | % gap vs lowest competitor |
-| `pricing_estimated_revenue_impact_usd` | Gauge | Cumulative revenue impact |
+| `pricing_estimated_revenue_impact_inr` | Gauge | Cumulative revenue impact |
 
 ---
 
@@ -436,7 +455,7 @@ python demo_load.py 15    # 15 runs
 → Run `python reset_products.py` to clear old data and reseed Indian products.
 
 **Agent always using COST_PLUS**
-→ Check your `OPENAI_API_KEY` in `.env`. If the LLM call fails, it falls back to cost-plus.
+→ Check your `OPENAI_API_KEY` in `.env`. If the LLM call fails, the agent holds the current price (logged as COST_PLUS).
 
 **Prometheus showing no data**
 → Make sure the backend is running on port 8000 and `/metrics` is reachable. In Docker, Prometheus uses `host.docker.internal:8000`.

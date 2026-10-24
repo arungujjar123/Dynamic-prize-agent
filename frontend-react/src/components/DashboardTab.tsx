@@ -133,7 +133,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
           </div>
           <div className="mt-3 text-2xl font-bold font-mono text-cyan-300">
             {summary?.estimated_revenue_impact !== undefined
-              ? `${summary.estimated_revenue_impact >= 0 ? '+' : ''}$${summary.estimated_revenue_impact.toFixed(0)}`
+              ? `${summary.estimated_revenue_impact >= 0 ? '+' : ''}₹${summary.estimated_revenue_impact.toFixed(0)}`
               : '$0'}
           </div>
           <div className="mt-1 text-xs text-slate-500">Net price shift benefit</div>
