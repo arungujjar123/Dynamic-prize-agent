@@ -9,7 +9,6 @@ from typing import Optional
 import httpx
 from bs4 import BeautifulSoup
 from loguru import logger
-from tenacity import retry, stop_after_attempt, wait_exponential
 import os
 
 SCRAPER_DELAY = float(os.getenv("SCRAPER_DELAY_SECONDS", 2))
@@ -90,7 +89,6 @@ def _extract_inr_price(text: str) -> Optional[float]:
     return None
 
 
-@retry(stop=stop_after_attempt(2), wait=wait_exponential(min=2, max=8))
 async def scrape_competitor_price(url: str, product_name: str) -> dict:
     """
     Scrape Amazon.in or Flipkart for price.

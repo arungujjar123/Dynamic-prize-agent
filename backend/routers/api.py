@@ -1,9 +1,11 @@
 """
 FastAPI routers — Products, Decisions, Agent Control, E-com API simulation
 """
+import os
+import secrets
 from datetime import datetime
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Header
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc, func
@@ -14,6 +16,17 @@ from backend.db.models import (
     Product, PriceDecision, AgentRun, DemandSignal,
     CompetitorPrice, AgentStatus
 )
+
+# ── Auth ──────────────────────────────────────────────────────────────────────
+
+async def require_api_key(x_api_key: Optional[str] = Header(default=None)):
+    """Protects write endpoints when API_KEY is set. Unset = open (local dev only)."""
+    expected = os.getenv("API_KEY")
+    if not expected:
+        return
+    if not x_api_key or not secrets.compare_digest(x_api_key, expected):
+        raise HTTPException(status_code=401, detail="Invalid or missing X-API-Key")
+
 
 # ── Pydantic Schemas ──────────────────────────────────────────────────────────
 
@@ -59,14 +72,14 @@ async def get_product(product_id: str, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Product not found")
     return _product_to_dict(product)
 
-@products_router.post("/")
+@products_router.post("/", dependencies=[Depends(require_api_key)])
 async def create_product(data: ProductCreate, db: AsyncSession = Depends(get_db)):
     product = Product(**data.model_dump())
     db.add(product)
     await db.flush()
     return _product_to_dict(product)
 
-@products_router.patch("/{product_id}")
+@products_router.patch("/{product_id}", dependencies=[Depends(require_api_key)])
 async def update_product(product_id: str, data: ProductUpdate, db: AsyncSession = Depends(get_db)):
     product = await db.get(Product, product_id)
     if not product:
@@ -152,7 +165,7 @@ agent_router = APIRouter(prefix="/agent", tags=["Agent Control"])
 
 _running_runs: set[str] = set()
 
-@agent_router.post("/run")
+@agent_router.post("/run", dependencies=[Depends(require_api_key)])
 async def trigger_agent_run(
     request: AgentRunRequest,
     background_tasks: BackgroundTasks,

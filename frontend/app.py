@@ -12,6 +12,7 @@ import time
 import os
 
 API_BASE = os.getenv("API_BASE", "http://backend:8000/api/v1")
+API_HEADERS = {"X-API-Key": os.environ["API_KEY"]} if os.getenv("API_KEY") else {}
 
 st.set_page_config(
     page_title="Dynamic Pricing Agent",
@@ -150,7 +151,7 @@ def api_get(path: str, default=None):
 
 def api_post(path: str, payload: dict = {}):
     try:
-        r = requests.post(f"{API_BASE}{path}", json=payload, timeout=30)
+        r = requests.post(f"{API_BASE}{path}", json=payload, headers=API_HEADERS, timeout=30)
         r.raise_for_status()
         return r.json(), None
     except Exception as e:
@@ -246,7 +247,7 @@ with tab1:
         (col1, "Active Products", dashboard.get("active_products", 0), None),
         (col2, "Decisions Made", dashboard.get("total_decisions", 0), None),
         (col3, "Avg Margin", f"{dashboard.get('avg_margin_pct', 0):.1f}%", None),
-        (col4, "Revenue Impact", f"${dashboard.get('estimated_revenue_impact', 0):+.0f}", None),
+        (col4, "Revenue Impact", f"₹{dashboard.get('estimated_revenue_impact', 0):+,.0f}", None),
         (col5, "Low Stock", dashboard.get("low_stock_products", 0), "⚠️"),
     ]
 

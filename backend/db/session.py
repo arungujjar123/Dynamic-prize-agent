@@ -11,8 +11,16 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+asyncpg://pricing_user:pricing_pass@localhost:5432/pricing_db")
-SYNC_DATABASE_URL = os.getenv("SYNC_DATABASE_URL", "postgresql://pricing_user:pricing_pass@localhost:5432/pricing_db")
+def _normalize_urls(url: str) -> tuple[str, str]:
+    """Accept plain postgres:// URLs (as given by Render/Heroku/Railway) and derive async + sync variants"""
+    base = url.split("://", 1)[1]
+    return f"postgresql+asyncpg://{base}", f"postgresql://{base}"
+
+
+DATABASE_URL, _derived_sync_url = _normalize_urls(
+    os.getenv("DATABASE_URL", "postgresql+asyncpg://pricing_user:pricing_pass@localhost:5432/pricing_db")
+)
+SYNC_DATABASE_URL = os.getenv("SYNC_DATABASE_URL") or _derived_sync_url
 
 async_engine = create_async_engine(
     DATABASE_URL,

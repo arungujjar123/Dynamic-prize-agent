@@ -156,8 +156,8 @@ scraper_duration_seconds = Histogram(
 # ══════════════════════════════════════════════════════════════
 
 product_current_price = Gauge(
-    "pricing_product_current_price_usd",
-    "Current price per product",
+    "pricing_product_current_price_inr",
+    "Current price per product (INR)",
     ["product_id", "product_name"],
     registry=registry,
 )
@@ -190,9 +190,9 @@ competitor_price_gap_percent = Gauge(
     registry=registry,
 )
 
-revenue_impact_usd = Gauge(
-    "pricing_estimated_revenue_impact_usd",
-    "Estimated cumulative revenue impact from all price changes",
+revenue_impact_inr = Gauge(
+    "pricing_estimated_revenue_impact_inr",
+    "Estimated cumulative revenue impact (INR) from all price changes",
     registry=registry,
 )
 

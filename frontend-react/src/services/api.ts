@@ -9,16 +9,18 @@ import {
 } from '../types';
 
 const API_BASE = (import.meta as any).env?.VITE_API_BASE || '/api/v1';
+const API_KEY = (import.meta as any).env?.VITE_API_KEY;
 
 async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
   const url = `${API_BASE}${endpoint}`;
   try {
     const res = await fetch(url, {
+      ...options,
       headers: {
         'Content-Type': 'application/json',
+        ...(API_KEY ? { 'X-API-Key': API_KEY } : {}),
         ...(options?.headers || {}),
       },
-      ...options,
     });
 
     if (!res.ok) {
@@ -105,7 +107,8 @@ export const api = {
   },
 
   async checkHealth(): Promise<{ status: string; scheduler_running: boolean; timestamp: string }> {
-    const res = await fetch('/health');
+    // /health lives at the backend root, next to /api/v1 (works for relative and absolute API_BASE)
+    const res = await fetch(`${API_BASE.replace(/\/api\/v1\/?$/, '')}/health`);
     return res.json();
   }
 };

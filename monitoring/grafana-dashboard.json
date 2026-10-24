@@ -121,7 +121,7 @@
 
     { "id": 14, "title": "Estimated Revenue Impact (USD)", "type": "stat",
       "gridPos": {"h": 4, "w": 4, "x": 0, "y": 22},
-      "targets": [{"expr": "pricing_estimated_revenue_impact_usd", "legendFormat": "Impact"}],
+      "targets": [{"expr": "pricing_estimated_revenue_impact_inr", "legendFormat": "Impact"}],
       "fieldConfig": {"defaults": {"unit": "currencyUSD", "thresholds": {"steps": [{"color": "red", "value": -100}, {"color": "yellow", "value": 0}, {"color": "green", "value": 100}]}}},
       "options": {"colorMode": "background", "reduceOptions": {"calcs": ["lastNotNull"]}}
     },
@@ -142,7 +142,7 @@
     { "id": 17, "title": "Current Prices vs Inventory", "type": "table",
       "gridPos": {"h": 4, "w": 6, "x": 18, "y": 22},
       "targets": [
-        {"expr": "pricing_product_current_price_usd", "legendFormat": "{{product_name}}", "instant": true},
+        {"expr": "pricing_product_current_price_inr", "legendFormat": "{{product_name}}", "instant": true},
         {"expr": "pricing_product_inventory_level", "legendFormat": "{{product_name}}", "instant": true}
       ],
       "options": {"sortBy": [{"displayName": "Value", "desc": true}]}

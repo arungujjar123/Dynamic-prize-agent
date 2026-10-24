@@ -25,12 +25,22 @@ from backend.metrics.prometheus import (
     record_llm_call, record_llm_error,
     record_decision, record_guardrail,
     update_product_metrics, active_products_total,
-    revenue_impact_usd,
+    revenue_impact_inr,
 )
+from backend.agents.guardrails import apply_guardrails, enforce_strategy_direction
 from sqlalchemy import select
 import random
 
-client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+_client: Optional[AsyncOpenAI] = None
+
+
+def _get_client() -> AsyncOpenAI:
+    """Lazy client — a missing OPENAI_API_KEY should trigger the fallback, not crash on import"""
+    global _client
+    if _client is None:
+        _client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    return _client
+
 MODEL = os.getenv("OPENAI_MODEL", "gpt-4o")
 MIN_MARGIN = float(os.getenv("MIN_MARGIN_PERCENT", 15)) / 100
 MAX_VELOCITY = float(os.getenv("MAX_PRICE_CHANGE_VELOCITY", 20)) / 100
@@ -81,35 +91,18 @@ def _simulate_demand(product: Product) -> dict:
     }
 
 
-async def _apply_guardrails(product: Product, price: float) -> float:
+def _apply_guardrails(product: Product, price: float) -> float:
     """Hard guardrail enforcement — records metric for each triggered rule"""
-    # Floor: min_price
-    if price < product.min_price:
-        record_guardrail("price_floor")
-        price = product.min_price
-
-    # Floor: margin
-    margin_floor = product.cost_price * (1 + MIN_MARGIN)
-    if price < margin_floor:
-        record_guardrail("min_margin")
-        price = margin_floor
-
-    # Ceiling: max_price
-    if price > product.max_price:
-        record_guardrail("price_ceiling")
-        price = product.max_price
-
-    # Velocity: max % change per run
-    max_up = product.current_price * (1 + MAX_VELOCITY)
-    max_down = product.current_price * (1 - MAX_VELOCITY)
-    if price > max_up:
-        record_guardrail("max_velocity")
-        price = max_up
-    if price < max_down:
-        record_guardrail("max_velocity")
-        price = max_down
-
-    return round(price, 0)  # Round to nearest rupee
+    return apply_guardrails(
+        price,
+        current_price=product.current_price,
+        cost_price=product.cost_price,
+        min_price=product.min_price,
+        max_price=product.max_price,
+        min_margin=MIN_MARGIN,
+        max_velocity=MAX_VELOCITY,
+        on_trigger=record_guardrail,
+    )
 
 
 async def run_pricing_for_product(product: Product, agent_run_id: str):
@@ -158,7 +151,7 @@ async def run_pricing_for_product(product: Product, agent_run_id: str):
     result = None
 
     try:
-        response = await client.chat.completions.create(
+        response = await _get_client().chat.completions.create(
             model=MODEL,
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
@@ -178,11 +171,12 @@ async def run_pricing_for_product(product: Product, agent_run_id: str):
                      "timeout" if "timeout" in str(e).lower() else "api_error"
         record_llm_error(error_type)
         status = "fallback"
-        fallback_price = round(product.cost_price * 1.40, 0)
+        # Safe fallback: HOLD the current price instead of jumping to cost-plus,
+        # so an OpenAI outage never triggers a wave of price cuts.
         result = {
-            "recommended_price": fallback_price,
+            "recommended_price": product.current_price,
             "strategy": "COST_PLUS",
-            "reasoning": f"LLM unavailable, cost-plus fallback: ₹{fallback_price:.0f}",
+            "reasoning": f"LLM unavailable — holding current price ₹{product.current_price:.0f}",
             "confidence_score": 0.3,
         }
         logger.warning(f"⚠️ LLM fallback for {product.name}: {e}")
@@ -197,19 +191,13 @@ async def run_pricing_for_product(product: Product, agent_run_id: str):
     strategy_str = result.get("strategy", "COST_PLUS").upper()
 
     # Catch and correct strategy-direction mismatches
-    if strategy_str == "SURGE" and raw_price <= product.current_price:
-        logger.warning(f"⚠️  SURGE price not raised — auto-correcting +8%")
-        raw_price = round(product.current_price * 1.08, 0)
+    raw_price, correction = enforce_strategy_direction(
+        strategy_str, raw_price, product.current_price, lowest_competitor
+    )
+    if correction:
+        logger.warning(f"⚠️  {correction}")
 
-    elif strategy_str == "CLEARANCE" and raw_price >= product.current_price:
-        logger.warning(f"⚠️  CLEARANCE price not lowered — auto-correcting -8%")
-        raw_price = round(product.current_price * 0.92, 0)
-
-    elif strategy_str == "COMPETITIVE" and lowest_competitor and raw_price > lowest_competitor:
-        logger.warning(f"⚠️  COMPETITIVE price above competitor — auto-correcting to -3%")
-        raw_price = round(lowest_competitor * 0.97, 0)
-
-    final_price = await _apply_guardrails(product, raw_price)
+    final_price = _apply_guardrails(product, raw_price)
     record_phase("guardrails", time.time() - t2)
 
     price_change_pct = ((final_price - product.current_price) / product.current_price) * 100
@@ -267,7 +255,7 @@ async def run_agent(triggered_by: str = "scheduler") -> AgentRun:
             triggered_by=triggered_by, started_at=datetime.utcnow(),
         )
         db.add(run)
-        await db.flush()
+        await db.commit()  # make the RUNNING row visible to the API immediately
 
         result = await db.execute(select(Product).where(Product.is_active == True))
         products = result.scalars().all()
@@ -293,6 +281,7 @@ async def run_agent(triggered_by: str = "scheduler") -> AgentRun:
                     decision.applied = True
                     prices_updated += 1
                 db.add(decision)
+                await db.commit()  # per-product commit — a later crash can't roll this back
                 record_phase("db_write", time.time() - t3)
 
                 decisions_made += 1
@@ -303,9 +292,15 @@ async def run_agent(triggered_by: str = "scheduler") -> AgentRun:
                 errors.append({"product_id": product.id, "error": str(e)})
 
         duration = time.time() - start_time
-        status = "completed" if not errors else "partial"
+        if not errors:
+            status = "completed"
+        elif decisions_made > 0:
+            status = "partial"
+        else:
+            status = "failed"
 
-        run.status = AgentStatus.COMPLETED if status == "completed" else AgentStatus.FAILED
+        # Partial runs did useful work — only mark FAILED when nothing succeeded
+        run.status = AgentStatus.FAILED if status == "failed" else AgentStatus.COMPLETED
         run.products_processed = len(products)
         run.decisions_made = decisions_made
         run.prices_updated = prices_updated
@@ -315,7 +310,7 @@ async def run_agent(triggered_by: str = "scheduler") -> AgentRun:
         run.completed_at = datetime.utcnow()
         await db.flush()
 
-    revenue_impact_usd.set(round(cumulative_impact, 2))
+    revenue_impact_inr.set(round(cumulative_impact, 2))
     record_agent_run_complete(status, triggered_by, duration)
 
     logger.success(
