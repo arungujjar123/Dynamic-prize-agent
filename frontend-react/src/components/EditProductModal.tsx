@@ -20,6 +20,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
   const [maxPrice, setMaxPrice] = useState<number>(0);
   const [inventoryCount, setInventoryCount] = useState<number>(0);
   const [isActive, setIsActive] = useState<boolean>(true);
+  const [competitorUrls, setCompetitorUrls] = useState<string>('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -30,6 +31,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
       setMaxPrice(product.max_price);
       setInventoryCount(product.inventory_count);
       setIsActive(product.is_active);
+      setCompetitorUrls((product.competitor_urls ?? []).join('\n'));
       setError(null);
     }
   }, [product]);
@@ -53,6 +55,10 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
         max_price: Number(maxPrice),
         inventory_count: Number(inventoryCount),
         is_active: isActive,
+        competitor_urls: competitorUrls
+          .split('\n')
+          .map((u) => u.trim())
+          .filter(Boolean),
       });
       onSuccess(updated);
     } catch (err: any) {
@@ -173,6 +179,21 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
               value={inventoryCount}
               onChange={(e) => setInventoryCount(parseInt(e.target.value, 10) || 0)}
               className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-xs font-mono text-slate-200 focus:outline-none focus:border-blue-500"
+            />
+          </div>
+
+          {/* Competitor product pages scraped via Apify */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-mono text-slate-400 flex items-center justify-between">
+              <span>Competitor URLs (one per line)</span>
+              <span className="text-[11px] text-slate-500">Amazon.in / Flipkart product pages</span>
+            </label>
+            <textarea
+              rows={3}
+              value={competitorUrls}
+              onChange={(e) => setCompetitorUrls(e.target.value)}
+              placeholder={'https://www.amazon.in/dp/...\nhttps://www.flipkart.com/.../p/itm...'}
+              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-[11px] font-mono text-slate-200 focus:outline-none focus:border-blue-500 resize-y"
             />
           </div>
 

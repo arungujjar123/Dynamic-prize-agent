@@ -27,3 +27,33 @@ export const DecisionTrail: React.FC<{ decision: PriceDecision }> = ({ decision 
     </div>
   );
 };
+
+const SITE_LABELS: Record<string, string> = { 'amazon.in': 'Amazon.in', 'flipkart.com': 'Flipkart' };
+
+/** Competitor prices the decision was based on, marked live (scraped) or simulated. */
+export const CompetitorQuotes: React.FC<{ decision: PriceDecision }> = ({ decision }) => {
+  const quotes = (decision.competitor_data ?? []).filter((q) => q.price != null);
+  if (quotes.length === 0) return null;
+
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px]">
+      <span className="text-slate-500">Competitors:</span>
+      {quotes.map((q, i) => {
+        const live = q.source === 'scraped';
+        return (
+          <span
+            key={i}
+            title={live ? 'Scraped via Apify' : 'Simulated — no live price available'}
+            className={`px-2 py-0.5 rounded-md border ${
+              live
+                ? 'border-emerald-700/50 bg-emerald-950/30 text-emerald-300'
+                : 'border-slate-700 bg-slate-800/50 text-slate-400'
+            }`}
+          >
+            {SITE_LABELS[q.name ?? ''] ?? q.name} {formatINR(q.price)} · {live ? 'live' : 'simulated'}
+          </span>
+        );
+      })}
+    </div>
+  );
+};

@@ -129,6 +129,26 @@ ALLOWED_ORIGINS=https://your-frontend.example.com
 
 Write endpoints (`POST/PATCH /products`, `POST /agent/run`) require the `X-API-Key` header when `API_KEY` is set. The Streamlit app reads `API_KEY` and the React app reads `VITE_API_KEY` at build time — note that a key baked into a public frontend bundle is visible to anyone, so treat it as a basic gate, not real user auth.
 
+### 🕷️ Real competitor prices via Apify
+
+Amazon.in and Flipkart block plain HTTP scraping, so live prices come from [Apify](https://apify.com) Actors. Set `APIFY_TOKEN` to enable it; without it, the agent uses simulated prices exactly as before.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `APIFY_TOKEN` | — | Enables Apify scraping |
+| `APIFY_AMAZON_ACTOR` | `junglee~amazon-crawler` | Actor for amazon.in URLs (`username~actor-name`) |
+| `APIFY_FLIPKART_ACTOR` | `sourabhbgp~flipkart-product-scraper` | Actor for flipkart.com URLs |
+| `APIFY_AMAZON_INPUT` / `APIFY_FLIPKART_INPUT` | common URL fields | Optional JSON input template; `{url}` is replaced with the product URL |
+| `COMPETITOR_CACHE_HOURS` | `6` | Reuse a scraped price for this long before paying for another Actor run |
+| `SIMULATED_DATA_MAX_CHANGE_PERCENT` | `5` | Max price change per run when no live competitor price exists |
+
+How it behaves:
+- **Cost control:** a scraped price is cached per product and site, and a site that returned no price is not retried until the cache window passes. A run therefore costs at most one Actor run per competitor URL every `COMPETITOR_CACHE_HOURS`.
+- **Safety on simulated data:** without a live price, the agent never undercuts a simulated competitor, and changes are capped at ±5% per run, so made-up prices can't walk real prices down to the floor.
+- **Transparency:** each decision stores the competitor prices it used. The dashboard tags each one `live` or `simulated`.
+- **Product URLs:** set real product pages in *Products → Edit → Competitor URLs*. Changing them clears that product's cached prices.
+- **Debugging:** if an Actor returns data without a recognisable price, the backend logs the item's keys (`Apify … returned N items but no price — item keys: [...]`). Use them to pick another Actor or set an input template.
+
 ### 🧹 Resetting demo data on a hosted database
 
 When the database is not reachable from your machine (e.g. Render's internal Postgres), set `RESET_DEMO_DATA_ID` to any new value (e.g. `1`) and redeploy. On startup the backend deletes all runs, decisions and signals and reseeds products at their original prices. It runs **once per value**, so restarts don't wipe data again; set a different value to reset again.

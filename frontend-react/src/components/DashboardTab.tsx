@@ -24,7 +24,7 @@ import {
 import { DashboardSummary, DecisionStats, PriceDecision, Product } from '../types';
 import { StrategyBadge, PriceDelta } from './StrategyBadge';
 import { formatINR } from '../utils/format';
-import { DecisionTrail } from './DecisionTrail';
+import { CompetitorQuotes, DecisionTrail } from './DecisionTrail';
 
 interface DashboardTabProps {
   summary: DashboardSummary | null;
@@ -252,6 +252,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                         {d.reasoning}
                       </div>
                     )}
+                    <CompetitorQuotes decision={d} />
                     <DecisionTrail decision={d} />
 
                     {/* Footer metadata */}

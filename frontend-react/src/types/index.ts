@@ -22,6 +22,12 @@ export type PricingStrategy =
   | 'demand_based'
   | 'cost_plus';
 
+export interface CompetitorQuote {
+  name: string | null;
+  price: number | null;
+  source: 'scraped' | 'simulated' | string | null;
+}
+
 export interface PriceDecision {
   id: string;
   product_id: string;
@@ -33,6 +39,7 @@ export interface PriceDecision {
   confidence_score?: number | null;
   llm_price?: number | null;
   adjustments?: string[];
+  competitor_data?: CompetitorQuote[];
   applied: boolean;
   created_at: string | null;
 }

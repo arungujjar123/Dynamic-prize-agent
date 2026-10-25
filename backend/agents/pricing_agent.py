@@ -44,6 +44,9 @@ def _get_client() -> AsyncOpenAI:
 MODEL = os.getenv("OPENAI_MODEL", "gpt-4o")
 MIN_MARGIN = float(os.getenv("MIN_MARGIN_PERCENT", 15)) / 100
 MAX_VELOCITY = float(os.getenv("MAX_PRICE_CHANGE_VELOCITY", 20)) / 100
+# Tighter cap when no real competitor price is available, so simulated data
+# can't walk prices down to the floor run after run
+SIMULATED_MAX_VELOCITY = float(os.getenv("SIMULATED_DATA_MAX_CHANGE_PERCENT", 5)) / 100
 
 SYSTEM_PROMPT = f"""You are an expert dynamic pricing agent for TMLCStore, an Indian e-commerce store.
 All prices are in Indian Rupees (INR ₹). Competitors are Amazon.in and Flipkart.
@@ -72,7 +75,7 @@ HARD GUARDRAILS (non-negotiable):
 - recommended_price >= margin_floor_price (cost × {1 + MIN_MARGIN:.2f})
 - recommended_price >= min_price
 - recommended_price <= max_price
-- Change must be within ±{int(MAX_VELOCITY * 100)}% of current_price
+- Change must be within ±product.max_change_pct_this_run % of current_price
 
 Respond ONLY with valid JSON, no markdown, no extra text:
 {{
@@ -96,14 +99,19 @@ def _simulate_demand(product: Product) -> dict:
     }
 
 
-def _apply_guardrails(product: Product, price: float, adjustments: list[str]) -> float:
+def _apply_guardrails(
+    product: Product, price: float, adjustments: list[str], max_velocity: float = MAX_VELOCITY
+) -> float:
     """Hard guardrail enforcement — records a metric and an explanation for each triggered rule"""
     def on_trigger(rule: str):
         record_guardrail(rule)
-        adjustments.append(describe_guardrail(
+        message = describe_guardrail(
             rule, product.current_price, product.cost_price,
-            product.min_price, product.max_price, MIN_MARGIN, MAX_VELOCITY,
-        ))
+            product.min_price, product.max_price, MIN_MARGIN, max_velocity,
+        )
+        if rule == "max_velocity" and max_velocity < MAX_VELOCITY:
+            message += " (no live competitor price)"
+        adjustments.append(message)
 
     return apply_guardrails(
         price,
@@ -112,7 +120,7 @@ def _apply_guardrails(product: Product, price: float, adjustments: list[str]) ->
         min_price=product.min_price,
         max_price=product.max_price,
         min_margin=MIN_MARGIN,
-        max_velocity=MAX_VELOCITY,
+        max_velocity=max_velocity,
         on_trigger=on_trigger,
     )
 
@@ -122,12 +130,17 @@ async def run_pricing_for_product(product: Product, agent_run_id: str):
 
     # ── Phase 1: Scraping ──────────────────────────────────────────
     t0 = time.time()
-    competitor_data = await get_all_competitor_prices(product.name, product.competitor_urls or [])
+    competitor_data = await get_all_competitor_prices(
+        product.name, product.competitor_urls or [], product_id=product.id
+    )
     record_phase("scraping", time.time() - t0)
 
     competitor_prices = [c["price"] for c in competitor_data if c.get("price")]
-    competitor_data_is_real = any(c.get("source") == "scraped" for c in competitor_data)
+    real_prices = [c["price"] for c in competitor_data if c.get("price") and c.get("source") == "scraped"]
+    competitor_data_is_real = bool(real_prices)
     lowest_competitor = min(competitor_prices) if competitor_prices else None
+    lowest_real_competitor = min(real_prices) if real_prices else None
+    max_velocity = MAX_VELOCITY if competitor_data_is_real else SIMULATED_MAX_VELOCITY
     avg_competitor = sum(competitor_prices) / len(competitor_prices) if competitor_prices else None
 
     # ── Phase 2: Demand signals ────────────────────────────────────
@@ -147,6 +160,7 @@ async def run_pricing_for_product(product: Product, agent_run_id: str):
             "inventory_count": product.inventory_count,
             "low_stock_threshold": product.inventory_threshold,
             "is_low_stock": product.inventory_count <= product.inventory_threshold,
+            "max_change_pct_this_run": round(max_velocity * 100),
         },
         "competitors": {
             "amazon_in": next((c["price"] for c in competitor_data if "amazon" in c.get("competitor_name", "")), None),
@@ -208,13 +222,14 @@ async def run_pricing_for_product(product: Product, agent_run_id: str):
 
     # Catch and correct strategy-direction mismatches
     raw_price, correction = enforce_strategy_direction(
-        strategy_str, raw_price, product.current_price, lowest_competitor
+        # only undercut prices we actually observed, never simulated ones
+        strategy_str, raw_price, product.current_price, lowest_real_competitor
     )
     if correction:
         logger.warning(f"⚠️  {correction}")
         adjustments.append(correction)
 
-    final_price = _apply_guardrails(product, raw_price, adjustments)
+    final_price = _apply_guardrails(product, raw_price, adjustments, max_velocity)
     record_phase("guardrails", time.time() - t2)
 
     price_change_pct = ((final_price - product.current_price) / product.current_price) * 100
@@ -250,6 +265,10 @@ async def run_pricing_for_product(product: Product, agent_run_id: str):
         reasoning=result.get("reasoning", ""),
         llm_price=llm_price,
         adjustments=adjustments,
+        competitor_data=[
+            {"name": c.get("competitor_name"), "price": c.get("price"), "source": c.get("source")}
+            for c in competitor_data
+        ],
         confidence_score=confidence,
         agent_run_id=agent_run_id,
         applied=False,
