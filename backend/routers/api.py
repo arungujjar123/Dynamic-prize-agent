@@ -89,7 +89,14 @@ async def update_product(product_id: str, data: ProductUpdate, db: AsyncSession 
     product = await db.get(Product, product_id)
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
-    for k, v in data.model_dump(exclude_none=True).items():
+    changes = data.model_dump(exclude_none=True)
+    if "competitor_urls" in changes and changes["competitor_urls"] != (product.competitor_urls or []):
+        # cached prices belong to the old URLs — drop them so the next run scrapes the new pages
+        from sqlalchemy import delete
+        from backend.scrapers.competitor import forget_failures
+        await db.execute(delete(CompetitorPrice).where(CompetitorPrice.product_id == product_id))
+        forget_failures(product_id)
+    for k, v in changes.items():
         setattr(product, k, v)
     product.updated_at = datetime.utcnow()
     return _product_to_dict(product)
@@ -161,6 +168,7 @@ def _decision_to_dict(d: PriceDecision) -> dict:
         "strategy": d.strategy.value if d.strategy else None,
         "reasoning": d.reasoning, "confidence_score": d.confidence_score,
         "llm_price": d.llm_price, "adjustments": d.adjustments or [],
+        "competitor_data": d.competitor_data or [],
         "applied": d.applied,
         "created_at": _utc_iso(d.created_at),
     }

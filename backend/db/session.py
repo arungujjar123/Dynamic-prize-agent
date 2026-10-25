@@ -69,6 +69,7 @@ async def get_db_context():
 _COLUMN_MIGRATIONS = [
     "ALTER TABLE price_decisions ADD COLUMN IF NOT EXISTS llm_price DOUBLE PRECISION",
     "ALTER TABLE price_decisions ADD COLUMN IF NOT EXISTS adjustments JSON",
+    "ALTER TABLE price_decisions ADD COLUMN IF NOT EXISTS competitor_data JSON",
 ]
 
 

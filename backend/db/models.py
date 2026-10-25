@@ -63,6 +63,7 @@ class PriceDecision(Base):
     reasoning = Column(Text)
     llm_price = Column(Float)        # price the LLM originally recommended (None on fallback)
     adjustments = Column(JSON)       # corrections/guardrails applied on top of the LLM price
+    competitor_data = Column(JSON)   # [{name, price, source: scraped|simulated}] the decision was based on
     confidence_score = Column(Float)  # 0.0 - 1.0
     agent_run_id = Column(String)
     applied = Column(Boolean, default=False)
@@ -79,7 +80,7 @@ class CompetitorPrice(Base):
     competitor_name = Column(String, nullable=False)
     competitor_url = Column(String)
     price = Column(Float, nullable=False)
-    currency = Column(String, default="USD")
+    currency = Column(String, default="INR")
     availability = Column(String)
     scraped_at = Column(DateTime, default=datetime.utcnow)
 

@@ -4,7 +4,7 @@ import backend.agents.pricing_agent as agent
 
 
 async def test_llm_failure_holds_current_price(monkeypatch):
-    async def fake_competitors(name, urls):
+    async def fake_competitors(name, urls, product_id=None):
         return [{"competitor_name": "amazon.in", "price": 1400.0}]
 
     class BrokenClient:
@@ -32,8 +32,8 @@ async def test_llm_failure_holds_current_price(monkeypatch):
 async def test_corrections_are_recorded_on_the_decision(monkeypatch):
     import json
 
-    async def fake_competitors(name, urls):
-        return [{"competitor_name": "amazon.in", "price": 1240.0, "source": "simulated"}]
+    async def fake_competitors(name, urls, product_id=None):
+        return [{"competitor_name": "amazon.in", "price": 1240.0, "source": "scraped"}]
 
     class InconsistentLLM:
         """Says COMPETITIVE but prices above the lowest competitor"""
@@ -68,7 +68,7 @@ async def test_corrections_are_recorded_on_the_decision(monkeypatch):
 
 
 async def test_fallback_has_no_llm_price(monkeypatch):
-    async def fake_competitors(name, urls):
+    async def fake_competitors(name, urls, product_id=None):
         return []
 
     class BrokenClient:
@@ -87,3 +87,42 @@ async def test_fallback_has_no_llm_price(monkeypatch):
     decision, _ = await agent.run_pricing_for_product(product, "run-3")
     assert decision.llm_price is None
     assert decision.adjustments == []
+
+
+def _llm_returning(body):
+    import json
+
+    class FakeLLM:
+        class chat:
+            class completions:
+                @staticmethod
+                async def create(**kwargs):
+                    FakeLLM.last_context = json.loads(kwargs["messages"][1]["content"])
+                    message = SimpleNamespace(content=json.dumps(body))
+                    usage = SimpleNamespace(prompt_tokens=10, completion_tokens=5)
+                    return SimpleNamespace(choices=[SimpleNamespace(message=message)], usage=usage)
+    return FakeLLM
+
+
+async def test_simulated_competitor_data_limits_changes(monkeypatch):
+    async def simulated(name, urls, product_id=None):
+        return [{"competitor_name": "amazon.in", "price": 1240.0, "source": "simulated"}]
+
+    llm = _llm_returning({"recommended_price": 2500, "strategy": "COMPETITIVE",
+                          "reasoning": "match competitor", "confidence_score": 0.5})
+    monkeypatch.setattr(agent, "get_all_competitor_prices", simulated)
+    monkeypatch.setattr(agent, "_get_client", lambda: llm)
+
+    product = SimpleNamespace(
+        id="p4", name="Crompton Fan", category="Home",
+        cost_price=2200.0, current_price=3999.0, min_price=2699.0, max_price=5499.0,
+        inventory_count=18, inventory_threshold=8, competitor_urls=[],
+    )
+    decision, _ = await agent.run_pricing_for_product(product, "run-4")
+
+    # no "undercut simulated competitor" correction; cap tightened to ±5%
+    assert decision.new_price == 3799
+    assert decision.adjustments == ["Capped at ±5% change per run (no live competitor price)"]
+    assert llm.last_context["product"]["max_change_pct_this_run"] == 5
+    assert llm.last_context["competitors"]["data_source"] == "simulated"
+    assert decision.competitor_data == [{"name": "amazon.in", "price": 1240.0, "source": "simulated"}]

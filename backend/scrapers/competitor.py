@@ -10,6 +10,9 @@ import httpx
 from bs4 import BeautifulSoup
 from loguru import logger
 import os
+from datetime import datetime, timedelta
+
+from backend.scrapers import apify
 
 SCRAPER_DELAY = float(os.getenv("SCRAPER_DELAY_SECONDS", 2))
 
@@ -191,7 +194,104 @@ def _simulate_inr_price(url: str, domain: str, product_name: str) -> dict:
     }
 
 
-async def get_all_competitor_prices(product_name: str, competitor_urls: list[str]) -> list[dict]:
+# product_id|domain → when Apify last failed to return a price. In-memory on
+# purpose: a restart simply allows one fresh attempt.
+_apify_failures: dict[str, datetime] = {}
+
+
+def forget_failures(product_id: str):
+    for key in [k for k in _apify_failures if k.startswith(f"{product_id}|")]:
+        del _apify_failures[key]
+
+
+def _cache_hours() -> float:
+    return float(os.getenv("COMPETITOR_CACHE_HOURS", 6))
+
+
+async def _cached_price(product_id: str, domain: str) -> Optional[dict]:
+    """Latest real (scraped) price for this product+site if it is still fresh."""
+    from backend.db.session import AsyncSessionLocal
+    from backend.db.models import CompetitorPrice
+    from sqlalchemy import select, desc
+
+    max_age = timedelta(hours=_cache_hours())
+    async with AsyncSessionLocal() as session:
+        row = (await session.execute(
+            select(CompetitorPrice)
+            .where(CompetitorPrice.product_id == product_id, CompetitorPrice.competitor_name == domain)
+            .order_by(desc(CompetitorPrice.scraped_at))
+            .limit(1)
+        )).scalar_one_or_none()
+    if row and row.scraped_at and datetime.utcnow() - row.scraped_at < max_age:
+        return {
+            "competitor_name": domain, "competitor_url": row.competitor_url, "price": row.price,
+            "currency": "INR", "availability": row.availability, "source": "scraped",
+            "scraped_at": row.scraped_at.isoformat() + "Z",
+        }
+    return None
+
+
+async def _save_price(product_id: str, result: dict):
+    from backend.db.session import AsyncSessionLocal
+    from backend.db.models import CompetitorPrice
+
+    async with AsyncSessionLocal() as session:
+        session.add(CompetitorPrice(
+            product_id=product_id, competitor_name=result["competitor_name"],
+            competitor_url=result["competitor_url"], price=result["price"],
+            currency="INR", availability=result.get("availability"),
+        ))
+        await session.commit()
+
+
+async def get_competitor_price(url: str, product_name: str, product_id: Optional[str] = None) -> dict:
+    """
+    One competitor price, cheapest source first:
+      1. fresh cached scrape from the DB (avoids paying Apify every run)
+      2. Apify Actor, when APIFY_TOKEN is set
+      3. direct HTTP scrape (usually blocked), only without Apify
+      4. simulated price (source="simulated")
+    """
+    domain = _get_domain(url)
+
+    if product_id:
+        try:
+            cached = await _cached_price(product_id, domain)
+            if cached:
+                return cached
+        except Exception as e:
+            logger.warning(f"⚠️ Price cache unavailable: {type(e).__name__}")
+
+    if apify.is_configured():
+        failure_key = f"{product_id}|{domain}"
+        failed_at = _apify_failures.get(failure_key) if product_id else None
+        if failed_at and datetime.utcnow() - failed_at < timedelta(hours=_cache_hours()):
+            # don't pay for another Actor run that recently returned no price
+            return _simulate_inr_price(url, domain, product_name)
+
+        price = await apify.fetch_price(url)
+        if price:
+            result = {
+                "competitor_name": domain, "competitor_url": url, "price": price,
+                "currency": "INR", "availability": "in_stock", "source": "scraped",
+                "scraped_at": datetime.utcnow().isoformat() + "Z",
+            }
+            if product_id:
+                try:
+                    await _save_price(product_id, result)
+                except Exception as e:
+                    logger.warning(f"⚠️ Could not cache price: {type(e).__name__}")
+            return result
+        if product_id:
+            _apify_failures[failure_key] = datetime.utcnow()
+        return _simulate_inr_price(url, domain, product_name)
+
+    return await scrape_competitor_price(url, product_name)
+
+
+async def get_all_competitor_prices(
+    product_name: str, competitor_urls: list[str], product_id: Optional[str] = None
+) -> list[dict]:
     """Fetch competitor prices from Amazon.in and Flipkart concurrently"""
     if not competitor_urls:
         # Default to Amazon.in + Flipkart simulations
@@ -200,7 +300,7 @@ async def get_all_competitor_prices(product_name: str, competitor_urls: list[str
             _simulate_inr_price("https://www.flipkart.com", "flipkart.com", product_name),
         ]
 
-    tasks = [scrape_competitor_price(url, product_name) for url in competitor_urls]
+    tasks = [get_competitor_price(url, product_name, product_id) for url in competitor_urls]
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
     valid = []
