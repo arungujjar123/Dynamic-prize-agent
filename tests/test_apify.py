@@ -97,3 +97,13 @@ def test_forget_failures_only_clears_that_product(monkeypatch):
     competitor._apify_failures.update({"p1|amazon.in": datetime.utcnow(), "p2|amazon.in": datetime.utcnow()})
     competitor.forget_failures("p1")
     assert list(competitor._apify_failures) == ["p2|amazon.in"]
+
+
+@pytest.mark.parametrize("item,expected", [
+    ({"price": [{"value": 2125}]}, 2125),
+    ({"price": {"sellingPrice": {"decimalValue": "2,125.00"}}}, 2125),
+    ({"price": None, "mrp": 2999, "discountAmount": 874}, 2125),
+    ({"price": 0, "mrp": 2999}, None),                      # MRP alone is not a selling price
+])
+def test_extract_price_more_shapes(item, expected):
+    assert apify.extract_price(item) == expected

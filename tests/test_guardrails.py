@@ -70,3 +70,8 @@ def test_describe_guardrail_messages():
     assert describe_guardrail("price_ceiling", **args) == "Capped at max price ₹1,500"
     assert describe_guardrail("price_floor", **args) == "Raised to min price ₹900"
     assert describe_guardrail("min_margin", **args) == "Raised to margin floor ₹920"
+
+
+def test_sub_rupee_overshoot_is_not_reported_as_capped():
+    # current ₹453, -20% cap = ₹362.40; an LLM price of ₹362 should pass untouched
+    assert clamp(362, current_price=453, cost_price=180, min_price=249, max_price=699) == (362, [])

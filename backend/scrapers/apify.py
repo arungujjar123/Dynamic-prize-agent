@@ -65,8 +65,15 @@ def build_input(site: str, url: str) -> dict:
     }
 
 
-def _to_price(value: Any) -> Optional[float]:
-    if isinstance(value, bool):
+def _to_price(value: Any, depth: int = 0) -> Optional[float]:
+    if isinstance(value, bool) or value is None or depth > 3:
+        return None
+    if isinstance(value, list):
+        # e.g. [{"value": 1299}] — first parseable entry wins
+        for entry in value:
+            price = _to_price(entry, depth + 1)
+            if price:
+                return price
         return None
     if isinstance(value, (int, float)):
         price = float(value)
@@ -76,10 +83,12 @@ def _to_price(value: Any) -> Optional[float]:
             return None
         price = float(match.group().replace(",", ""))
     elif isinstance(value, dict):
-        # e.g. {"value": 1299, "currency": "INR"}
-        for key in ("value", "amount", "price"):
+        # e.g. {"value": 1299, "currency": "INR"} or {"sellingPrice": {"decimalValue": "1299"}}
+        for key in PRICE_KEYS + ("decimalValue", "raw"):
             if key in value:
-                return _to_price(value[key])
+                price = _to_price(value[key], depth + 1)
+                if price:
+                    return price
         return None
     else:
         return None
@@ -101,7 +110,16 @@ def extract_price(item: dict) -> Optional[float]:
                     price = _to_price(nested[key])
                     if price:
                         return price
+    # Some Actors give only MRP + discount, e.g. {"mrp": 2999, "discountAmount": 500}
+    mrp, discount = _to_price(item.get("mrp")), _to_price(item.get("discountAmount"))
+    if mrp and discount and discount < mrp:
+        return mrp - discount
     return None
+
+
+def _preview(value: Any) -> str:
+    text = json.dumps(value, ensure_ascii=False, default=str)
+    return text if len(text) <= 200 else text[:200] + "…"
 
 
 async def fetch_price(url: str) -> Optional[float]:
@@ -136,8 +154,12 @@ async def fetch_price(url: str) -> Optional[float]:
                 return price
 
     sample = items[0] if isinstance(items, list) and items and isinstance(items[0], dict) else {}
+    if "error" in sample:
+        logger.warning(f"⚠️ Apify {actor} could not scrape this URL: {_preview(sample.get('error'))}")
+        return None
+    price_fields = {k: sample[k] for k in ("price", "mrp", "discountAmount", "offers") if k in sample}
     logger.warning(
         f"⚠️ Apify {actor} returned {len(items) if isinstance(items, list) else 0} items "
-        f"but no price — item keys: {sorted(sample.keys())[:30]}"
+        f"but no price — item keys: {sorted(sample.keys())[:30]}; price fields: {_preview(price_fields)}"
     )
     return None

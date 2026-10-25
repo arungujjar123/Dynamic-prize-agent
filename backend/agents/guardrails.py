@@ -26,8 +26,10 @@ def apply_guardrails(
             on_trigger(rule)
 
     # 1. Velocity: max % change per run
-    max_up = current_price * (1 + max_velocity)
-    max_down = current_price * (1 - max_velocity)
+    # rounded to whole rupees so a price a few paise past the cap (e.g. ₹362 vs
+    # ₹362.40) doesn't count as "capped" and then round back to the same price
+    max_up = round(current_price * (1 + max_velocity))
+    max_down = round(current_price * (1 - max_velocity))
     if price > max_up:
         hit("max_velocity")
         price = max_up
