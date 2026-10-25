@@ -54,7 +54,7 @@ async def test_fetch_price_failure_returns_none(monkeypatch):
 async def test_competitor_price_falls_back_to_simulated_when_apify_has_no_price(monkeypatch):
     monkeypatch.setenv("APIFY_TOKEN", "tok")
 
-    async def no_price(url):
+    async def no_price(url, product_name=''):
         return None
 
     monkeypatch.setattr(apify, "fetch_price", no_price)
@@ -65,7 +65,7 @@ async def test_competitor_price_falls_back_to_simulated_when_apify_has_no_price(
 async def test_competitor_price_uses_apify_result(monkeypatch):
     monkeypatch.setenv("APIFY_TOKEN", "tok")
 
-    async def price(url):
+    async def price(url, product_name=''):
         return 1199.0
 
     monkeypatch.setattr(apify, "fetch_price", price)
@@ -77,7 +77,7 @@ async def test_failed_apify_lookup_is_not_retried_every_run(monkeypatch):
     monkeypatch.setenv("APIFY_TOKEN", "tok")
     calls = []
 
-    async def no_price(url):
+    async def no_price(url, product_name=''):
         calls.append(url)
         return None
 
@@ -107,3 +107,39 @@ def test_forget_failures_only_clears_that_product(monkeypatch):
 ])
 def test_extract_price_more_shapes(item, expected):
     assert apify.extract_price(item) == expected
+
+
+NOISE_URL = ("https://www.flipkart.com/noise-colorfit-pro4-bluetooth-calling-1-72-truview-display-functional-crown-smartwatch"
+             "/p/itm081878581e874?pid=SMWGEQFXT4AA9UVW&lid=LSTSMWGEQFXT4AA9UVWCD6XPC&marketplace=FLIPKART")
+# shape of zaver.api/flipkart-scraper search results
+SEARCH_RESULTS = [
+    {"title": "Noise Icon 4 with Stunning 1.96\" AMOLED Display", "price": 1899, "originalPrice": 6999,
+     "url": "https://www.flipkart.com/noise-icon-4/p/itmb7800093c5c95?pid=SMWGWZVPQWQSG2UH"},
+    {"title": "Noise ColorFit Pro4 Bluetooth Calling with 1.72\" TruView Display", "price": 2999, "originalPrice": 5999,
+     "url": "https://www.flipkart.com/noise-colorfit-pro4/p/itmd32f591cb52c6?pid=SMWGE6YXFRKJGBGD"},
+    {"title": "Noise ColorFit Pro4 Bluetooth Calling with 1.72\" TruView Display", "price": 2899, "originalPrice": 5999,
+     "url": "https://www.flipkart.com/noise-colorfit-pro4/p/itm081878581e874?pid=SMWGEQFXT4AA9UVW"},
+]
+
+
+def test_product_ids():
+    assert apify.product_ids(NOISE_URL) == ["SMWGEQFXT4AA9UVW", "itm081878581e874"]
+    assert apify.product_ids("https://www.amazon.in/Mamaearth/dp/B07WQTJ5ZP?th=1") == ["B07WQTJ5ZP"]
+
+
+def test_pick_item_matches_exact_variant_in_search_results():
+    assert apify.pick_item(SEARCH_RESULTS, NOISE_URL, "Noise ColorFit Pro 4 Smartwatch")["price"] == 2899
+
+
+def test_pick_item_falls_back_to_title_and_refuses_bad_matches():
+    other_url = "https://www.flipkart.com/x/p/itmzzz?pid=NOTINRESULTS"
+    picked = apify.pick_item(SEARCH_RESULTS, other_url, "Noise ColorFit Pro4 Bluetooth Calling TruView Display")
+    assert picked["price"] in (2999, 2899)
+    assert apify.pick_item(SEARCH_RESULTS, other_url, "Crompton Aura Prime LED Ceiling Fan") is None
+    # a single result (product-page Actors) is taken as-is
+    assert apify.pick_item(SEARCH_RESULTS[:1], other_url, "anything")["price"] == 1899
+
+
+def test_input_template_fills_query_and_url_safely(monkeypatch):
+    monkeypatch.setenv("APIFY_FLIPKART_INPUT", '{"query": "{query}", "maxItems": 20}')
+    assert apify.build_input("flipkart", NOISE_URL, 'Noise 1.72" Watch') == {"query": 'Noise 1.72" Watch', "maxItems": 20}
