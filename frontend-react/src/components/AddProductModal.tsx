@@ -58,6 +58,11 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ onClose, onSuc
     setError(null);
 
     const productId = `prod_${Date.now()}`;
+    // include a URL that was typed but not yet added with "Add URL"
+    const pendingUrl = competitorUrl.trim();
+    const allUrls = pendingUrl && !competitorUrls.includes(pendingUrl)
+      ? [...competitorUrls, pendingUrl]
+      : competitorUrls;
 
     try {
       const created = await api.createProduct({
@@ -72,7 +77,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ onClose, onSuc
         inventory_count: Number(inventoryCount),
         inventory_threshold: Number(inventoryThreshold),
         is_active: true,
-        competitor_urls: competitorUrls,
+        competitor_urls: allUrls,
       });
 
       onSuccess(created);
