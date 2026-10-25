@@ -60,7 +60,7 @@ export const AgentRunsTab: React.FC<AgentRunsTabProps> = ({
                   )}
                 </h2>
                 <p className="text-xs text-slate-400 font-mono mt-0.5">
-                  5-Phase Lifecycle: Scrape Competitors → Inventory Check → OpenAI Reasoning → Guardrail Audit → Atomic DB Update
+                  5-Phase Lifecycle: Scrape Competitors → Inventory Check → LLM Reasoning → Guardrail Audit → Atomic DB Update
                 </p>
               </div>
             </div>
@@ -196,7 +196,7 @@ export const AgentRunsTab: React.FC<AgentRunsTabProps> = ({
                     </div>
 
                     <div className="bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/60">
-                      <span className="text-slate-500 text-[11px] block">OpenAI Tokens</span>
+                      <span className="text-slate-500 text-[11px] block">LLM Tokens</span>
                       <span className="text-base font-bold text-amber-400 mt-0.5 block">
                         {run.total_tokens_used?.toLocaleString() || 0}
                       </span>

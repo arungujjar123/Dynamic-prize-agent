@@ -23,3 +23,11 @@ async def test_rejects_missing_or_wrong_key(monkeypatch):
 async def test_accepts_correct_key(monkeypatch):
     monkeypatch.setenv("API_KEY", "secret")
     await require_api_key("secret")
+
+
+def test_timestamps_are_marked_utc():
+    from datetime import datetime
+    from backend.routers.api import _utc_iso
+
+    assert _utc_iso(datetime(2026, 10, 25, 8, 4, 34)) == "2026-10-25T08:04:34Z"
+    assert _utc_iso(None) is None

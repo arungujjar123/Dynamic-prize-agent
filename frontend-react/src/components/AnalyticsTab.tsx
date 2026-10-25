@@ -12,6 +12,7 @@ import {
   Line
 } from 'recharts';
 import { PriceDecision, Product, DecisionStats } from '../types';
+import { formatINR } from '../utils/format';
 
 interface AnalyticsTabProps {
   decisions: PriceDecision[];
@@ -49,6 +50,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ decisions, products,
   // 2. Confidence Score Distribution
   const confidenceBuckets = useMemo(() => {
     const buckets: Record<string, number> = {
+      '<50%': 0,
       '50-60%': 0,
       '60-70%': 0,
       '70-80%': 0,
@@ -57,8 +59,11 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ decisions, products,
     };
 
     decisions.forEach((d) => {
-      const score = (d.confidence_score ?? 0.85) * 100;
-      if (score < 60) buckets['50-60%']++;
+      // Skip decisions without a score instead of inventing one
+      if (d.confidence_score === null || d.confidence_score === undefined) return;
+      const score = d.confidence_score * 100;
+      if (score < 50) buckets['<50%']++;
+      else if (score < 60) buckets['50-60%']++;
       else if (score < 70) buckets['60-70%']++;
       else if (score < 80) buckets['70-80%']++;
       else if (score < 90) buckets['80-90%']++;
@@ -103,7 +108,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ decisions, products,
         <div className="bg-slate-900/60 border border-slate-800 p-4 rounded-xl">
           <span className="text-[11px] font-mono uppercase text-slate-400">Average AI Confidence</span>
           <div className="text-2xl font-bold font-mono text-cyan-400 mt-2">
-            {stats?.avg_confidence ? `${Math.round(stats.avg_confidence * 100)}%` : '85%'}
+            {stats?.avg_confidence !== undefined ? `${Math.round(stats.avg_confidence * 100)}%` : '—'}
           </div>
           <span className="text-xs text-slate-500 font-mono">Calibrated across pricing runs</span>
         </div>
@@ -205,7 +210,7 @@ export const AnalyticsTab: React.FC<AnalyticsTabProps> = ({ decisions, products,
                   fontFamily: 'monospace',
                 }}
                 formatter={(val: any, _, item) => [
-                  `${Number(val).toFixed(1)}% (Price: $${item.payload.price.toFixed(2)}, Cost: $${item.payload.cost.toFixed(2)})`,
+                  `${Number(val).toFixed(1)}% (Price: ${formatINR(item.payload.price)}, Cost: ${formatINR(item.payload.cost)})`,
                   'Gross Margin',
                 ]}
               />

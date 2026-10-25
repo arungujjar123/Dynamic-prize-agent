@@ -12,6 +12,7 @@ import {
 import { PriceDecision, Product } from '../types';
 import { api } from '../services/api';
 import { StrategyBadge, PriceDelta } from './StrategyBadge';
+import { formatINR } from '../utils/format';
 
 interface ProductHistoryModalProps {
   productId: string | null;
@@ -89,15 +90,15 @@ export const ProductHistoryModal: React.FC<ProductHistoryModalProps> = ({
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-900/80 p-3.5 rounded-xl border border-slate-800/80 font-mono text-xs">
             <div>
               <span className="text-slate-500">Current Price:</span>
-              <div className="text-base font-bold text-blue-400 mt-0.5">${product.current_price.toFixed(2)}</div>
+              <div className="text-base font-bold text-blue-400 mt-0.5">{formatINR(product.current_price)}</div>
             </div>
             <div>
               <span className="text-slate-500">Cost Price:</span>
-              <div className="text-base font-bold text-slate-300 mt-0.5">${product.cost_price.toFixed(2)}</div>
+              <div className="text-base font-bold text-slate-300 mt-0.5">{formatINR(product.cost_price)}</div>
             </div>
             <div>
               <span className="text-slate-500">15% Margin Floor:</span>
-              <div className="text-base font-bold text-emerald-400 mt-0.5">${costFloor.toFixed(2)}</div>
+              <div className="text-base font-bold text-emerald-400 mt-0.5">{formatINR(costFloor)}</div>
             </div>
             <div>
               <span className="text-slate-500">Inventory:</span>
@@ -162,7 +163,7 @@ export const ProductHistoryModal: React.FC<ProductHistoryModalProps> = ({
                       fontFamily: 'monospace',
                     }}
                     labelFormatter={(_, payload) => payload?.[0]?.payload?.fullDate || ''}
-                    formatter={(val: any) => [`$${Number(val).toFixed(2)}`, 'Price']}
+                    formatter={(val: any) => [formatINR(Number(val)), 'Price']}
                   />
                   {costFloor > 0 && (
                     <ReferenceLine
@@ -216,7 +217,7 @@ export const ProductHistoryModal: React.FC<ProductHistoryModalProps> = ({
                       <StrategyBadge strategy={d.strategy} size="sm" />
                     </td>
                     <td className="py-2.5 px-3 font-semibold text-slate-100">
-                      ${d.old_price.toFixed(2)} → <span className="text-blue-400">${d.new_price.toFixed(2)}</span>
+                      {formatINR(d.old_price)} → <span className="text-blue-400">{formatINR(d.new_price)}</span>
                       <span className="ml-2">
                         <PriceDelta pct={d.price_change_pct} />
                       </span>

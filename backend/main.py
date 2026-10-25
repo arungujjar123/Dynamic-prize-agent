@@ -112,7 +112,7 @@ async def health():
     return {
         "status": "healthy",
         "scheduler_running": scheduler.running,
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.utcnow().isoformat() + "Z",
     }
 
 
