@@ -60,9 +60,12 @@ def enforce_strategy_direction(
     price: float,
     current_price: float,
     lowest_competitor: Optional[float],
+    floor_price: float = 0,
 ) -> tuple[float, Optional[str]]:
     """
     Correct LLM outputs whose price contradicts the chosen strategy.
+    floor_price is the lowest price guardrails allow (min price / margin floor);
+    a COMPETITIVE price is never pushed below it.
     Returns (price, correction_message or None).
     """
     if strategy == "SURGE" and price <= current_price:
@@ -72,9 +75,16 @@ def enforce_strategy_direction(
         return round(current_price * 0.92, 0), "CLEARANCE must lower the price → set to −8%"
 
     if strategy == "COMPETITIVE" and lowest_competitor and price > lowest_competitor:
-        return round(lowest_competitor * 0.97, 0), (
-            f"COMPETITIVE must undercut the lowest competitor (₹{lowest_competitor:,.0f}) → set 3% below"
-        )
+        undercut = round(lowest_competitor * 0.97, 0)
+        if undercut >= floor_price:
+            return undercut, (
+                f"COMPETITIVE must undercut the lowest competitor (₹{lowest_competitor:,.0f}) → set 3% below"
+            )
+        # can't undercut without breaking the floor — the floor is the most competitive legal price
+        if price > floor_price:
+            return round(floor_price, 0), (
+                f"Lowest competitor (₹{lowest_competitor:,.0f}) is below our floor → set to floor ₹{floor_price:,.0f}"
+            )
 
     return price, None
 
