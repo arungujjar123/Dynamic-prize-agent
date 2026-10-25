@@ -27,7 +27,7 @@ from backend.metrics.prometheus import (
     update_product_metrics, active_products_total,
     revenue_impact_inr,
 )
-from backend.agents.guardrails import apply_guardrails, enforce_strategy_direction
+from backend.agents.guardrails import apply_guardrails, describe_guardrail, enforce_strategy_direction
 from sqlalchemy import select
 import random
 
@@ -63,6 +63,11 @@ MANDATORY DIRECTION RULES — never violate:
 - COMPETITIVE strategy → recommended_price should be BELOW lowest competitor price
 - DEMAND_BASED → can go either direction based on demand_score
 
+CONFIDENCE CALIBRATION:
+- confidence_score must reflect data quality, not be a fixed value
+- If competitors.data_source is "simulated", confidence_score must be at most 0.6
+- Lower it further when demand signals and inventory point in different directions
+
 HARD GUARDRAILS (non-negotiable):
 - recommended_price >= margin_floor_price (cost × {1 + MIN_MARGIN:.2f})
 - recommended_price >= min_price
@@ -91,8 +96,15 @@ def _simulate_demand(product: Product) -> dict:
     }
 
 
-def _apply_guardrails(product: Product, price: float) -> float:
-    """Hard guardrail enforcement — records metric for each triggered rule"""
+def _apply_guardrails(product: Product, price: float, adjustments: list[str]) -> float:
+    """Hard guardrail enforcement — records a metric and an explanation for each triggered rule"""
+    def on_trigger(rule: str):
+        record_guardrail(rule)
+        adjustments.append(describe_guardrail(
+            rule, product.current_price, product.cost_price,
+            product.min_price, product.max_price, MIN_MARGIN, MAX_VELOCITY,
+        ))
+
     return apply_guardrails(
         price,
         current_price=product.current_price,
@@ -101,7 +113,7 @@ def _apply_guardrails(product: Product, price: float) -> float:
         max_price=product.max_price,
         min_margin=MIN_MARGIN,
         max_velocity=MAX_VELOCITY,
-        on_trigger=record_guardrail,
+        on_trigger=on_trigger,
     )
 
 
@@ -114,6 +126,7 @@ async def run_pricing_for_product(product: Product, agent_run_id: str):
     record_phase("scraping", time.time() - t0)
 
     competitor_prices = [c["price"] for c in competitor_data if c.get("price")]
+    competitor_data_is_real = any(c.get("source") == "scraped" for c in competitor_data)
     lowest_competitor = min(competitor_prices) if competitor_prices else None
     avg_competitor = sum(competitor_prices) / len(competitor_prices) if competitor_prices else None
 
@@ -140,6 +153,7 @@ async def run_pricing_for_product(product: Product, agent_run_id: str):
             "flipkart": next((c["price"] for c in competitor_data if "flipkart" in c.get("competitor_name", "")), None),
             "lowest_price": lowest_competitor,
             "avg_price": round(avg_competitor, 0) if avg_competitor else None,
+            "data_source": "scraped" if competitor_data_is_real else "simulated",
         },
         "demand": demand,
     }
@@ -189,6 +203,8 @@ async def run_pricing_for_product(product: Product, agent_run_id: str):
     t2 = time.time()
     raw_price = float(result.get("recommended_price", product.current_price))
     strategy_str = result.get("strategy", "COST_PLUS").upper()
+    llm_price = raw_price if status == "success" else None
+    adjustments: list[str] = []  # every change the code makes to the LLM's price, shown in the UI
 
     # Catch and correct strategy-direction mismatches
     raw_price, correction = enforce_strategy_direction(
@@ -196,8 +212,9 @@ async def run_pricing_for_product(product: Product, agent_run_id: str):
     )
     if correction:
         logger.warning(f"⚠️  {correction}")
+        adjustments.append(correction)
 
-    final_price = _apply_guardrails(product, raw_price)
+    final_price = _apply_guardrails(product, raw_price, adjustments)
     record_phase("guardrails", time.time() - t2)
 
     price_change_pct = ((final_price - product.current_price) / product.current_price) * 100
@@ -231,6 +248,8 @@ async def run_pricing_for_product(product: Product, agent_run_id: str):
         price_change_pct=round(price_change_pct, 2),
         strategy=strategy,
         reasoning=result.get("reasoning", ""),
+        llm_price=llm_price,
+        adjustments=adjustments,
         confidence_score=confidence,
         agent_run_id=agent_run_id,
         applied=False,

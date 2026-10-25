@@ -60,3 +60,13 @@ def test_competitive_goes_below_lowest_competitor():
 def test_consistent_decision_is_unchanged():
     assert enforce_strategy_direction("DEMAND_BASED", 1100, 1000, 900) == (1100, None)
     assert enforce_strategy_direction("SURGE", 1100, 1000, None) == (1100, None)
+
+
+def test_describe_guardrail_messages():
+    from backend.agents.guardrails import describe_guardrail
+    args = dict(current_price=1000, cost_price=800, min_price=900, max_price=1500,
+                min_margin=0.15, max_velocity=0.20)
+    assert describe_guardrail("max_velocity", **args) == "Capped at ±20% change per run"
+    assert describe_guardrail("price_ceiling", **args) == "Capped at max price ₹1,500"
+    assert describe_guardrail("price_floor", **args) == "Raised to min price ₹900"
+    assert describe_guardrail("min_margin", **args) == "Raised to margin floor ₹920"

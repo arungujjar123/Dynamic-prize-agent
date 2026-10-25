@@ -61,6 +61,8 @@ class PriceDecision(Base):
     price_change_pct = Column(Float)
     strategy = Column(SAEnum(PricingStrategy))
     reasoning = Column(Text)
+    llm_price = Column(Float)        # price the LLM originally recommended (None on fallback)
+    adjustments = Column(JSON)       # corrections/guardrails applied on top of the LLM price
     confidence_score = Column(Float)  # 0.0 - 1.0
     agent_run_id = Column(String)
     applied = Column(Boolean, default=False)
@@ -97,6 +99,14 @@ class DemandSignal(Base):
     recorded_at = Column(DateTime, default=datetime.utcnow)
 
     product = relationship("Product", back_populates="demand_signals")
+
+
+class AppSetting(Base):
+    """Small key/value store for one-off operational state (e.g. last demo reset id)"""
+    __tablename__ = "app_settings"
+
+    key = Column(String, primary_key=True)
+    value = Column(String)
 
 
 class AgentRun(Base):

@@ -12,7 +12,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { SchedulerStatus } from '../types';
-import { api } from '../services/api';
+import { api, BACKEND_ORIGIN, GRAFANA_URL, PROMETHEUS_URL } from '../services/api';
 
 interface GuardrailsTabProps {
   schedulerStatus: SchedulerStatus;
@@ -171,15 +171,15 @@ export const GuardrailsTab: React.FC<GuardrailsTabProps> = ({ schedulerStatus })
       {/* Observability & Diagnostic Stack */}
       <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-5 space-y-4">
         <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-blue-400 border-b border-slate-800 pb-2">
-          Enterprise Observability & Microservices Architecture
+          Observability Stack
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs font-mono">
           {/* FastAPI */}
           <div className="bg-slate-900/80 p-3.5 rounded-xl border border-slate-800 space-y-1">
             <span className="text-slate-500">FastAPI Backend</span>
-            <div className="text-sm font-bold text-slate-200">Port 8000</div>
+            <div className="text-sm font-bold text-slate-200">REST API</div>
             <a
-              href="http://localhost:8000/docs"
+              href={`${BACKEND_ORIGIN}/docs`}
               target="_blank"
               rel="noreferrer"
               className="text-blue-400 hover:underline flex items-center gap-1 pt-1"
@@ -203,14 +203,14 @@ export const GuardrailsTab: React.FC<GuardrailsTabProps> = ({ schedulerStatus })
           {/* Prometheus */}
           <div className="bg-slate-900/80 p-3.5 rounded-xl border border-slate-800 space-y-1">
             <span className="text-slate-500">Prometheus Engine</span>
-            <div className="text-sm font-bold text-cyan-400">Port 9090</div>
+            <div className="text-sm font-bold text-cyan-400">{PROMETHEUS_URL ? 'Connected' : 'docker-compose only'}</div>
             <a
-              href="http://localhost:9090"
+              href={PROMETHEUS_URL ?? `${BACKEND_ORIGIN}/metrics`}
               target="_blank"
               rel="noreferrer"
               className="text-cyan-400 hover:underline flex items-center gap-1 pt-1"
             >
-              <span>Prometheus Web UI</span>
+              <span>{PROMETHEUS_URL ? 'Prometheus Web UI' : 'Raw /metrics endpoint'}</span>
               <ExternalLink className="w-3 h-3" />
             </a>
           </div>
@@ -218,16 +218,20 @@ export const GuardrailsTab: React.FC<GuardrailsTabProps> = ({ schedulerStatus })
           {/* Grafana */}
           <div className="bg-slate-900/80 p-3.5 rounded-xl border border-slate-800 space-y-1">
             <span className="text-slate-500">Grafana Dashboards</span>
-            <div className="text-sm font-bold text-amber-400">Port 3001</div>
-            <a
-              href="http://localhost:3001"
-              target="_blank"
-              rel="noreferrer"
-              className="text-amber-400 hover:underline flex items-center gap-1 pt-1"
-            >
-              <span>Grafana 4-Pillars</span>
-              <ExternalLink className="w-3 h-3" />
-            </a>
+            <div className="text-sm font-bold text-amber-400">{GRAFANA_URL ? 'Connected' : 'docker-compose only'}</div>
+            {GRAFANA_URL ? (
+              <a
+                href={GRAFANA_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="text-amber-400 hover:underline flex items-center gap-1 pt-1"
+              >
+                <span>Grafana 4-Pillars</span>
+                <ExternalLink className="w-3 h-3" />
+              </a>
+            ) : (
+              <span className="text-slate-400 block pt-1">Run locally with docker-compose</span>
+            )}
           </div>
         </div>
       </div>

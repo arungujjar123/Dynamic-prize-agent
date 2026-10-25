@@ -64,12 +64,35 @@ def enforce_strategy_direction(
     Returns (price, correction_message or None).
     """
     if strategy == "SURGE" and price <= current_price:
-        return round(current_price * 1.08, 0), "SURGE price not raised — auto-correcting +8%"
+        return round(current_price * 1.08, 0), "SURGE must raise the price → set to +8%"
 
     if strategy == "CLEARANCE" and price >= current_price:
-        return round(current_price * 0.92, 0), "CLEARANCE price not lowered — auto-correcting -8%"
+        return round(current_price * 0.92, 0), "CLEARANCE must lower the price → set to −8%"
 
     if strategy == "COMPETITIVE" and lowest_competitor and price > lowest_competitor:
-        return round(lowest_competitor * 0.97, 0), "COMPETITIVE price above competitor — auto-correcting to -3%"
+        return round(lowest_competitor * 0.97, 0), (
+            f"COMPETITIVE must undercut the lowest competitor (₹{lowest_competitor:,.0f}) → set 3% below"
+        )
 
     return price, None
+
+
+def describe_guardrail(
+    rule: str,
+    current_price: float,
+    cost_price: float,
+    min_price: float,
+    max_price: float,
+    min_margin: float,
+    max_velocity: float,
+) -> str:
+    """Human-readable explanation of a triggered guardrail, shown next to the decision."""
+    if rule == "max_velocity":
+        return f"Capped at ±{max_velocity * 100:.0f}% change per run"
+    if rule == "price_ceiling":
+        return f"Capped at max price ₹{max_price:,.0f}"
+    if rule == "price_floor":
+        return f"Raised to min price ₹{min_price:,.0f}"
+    if rule == "min_margin":
+        return f"Raised to margin floor ₹{cost_price * (1 + min_margin):,.0f}"
+    return rule

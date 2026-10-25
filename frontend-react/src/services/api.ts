@@ -11,6 +11,13 @@ import {
 const API_BASE = (import.meta as any).env?.VITE_API_BASE || '/api/v1';
 const API_KEY = (import.meta as any).env?.VITE_API_KEY;
 
+const env = (import.meta as any).env ?? {};
+/** Backend root (where /docs, /metrics and /health live), next to /api/v1 */
+export const BACKEND_ORIGIN = API_BASE.replace(/\/api\/v1\/?$/, '');
+/** Prometheus/Grafana only run in the docker-compose stack; links are hidden unless configured */
+export const PROMETHEUS_URL: string | undefined = env.VITE_PROMETHEUS_URL || (env.DEV ? 'http://localhost:9090' : undefined);
+export const GRAFANA_URL: string | undefined = env.VITE_GRAFANA_URL || (env.DEV ? 'http://localhost:3001' : undefined);
+
 async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
   const url = `${API_BASE}${endpoint}`;
   try {
@@ -107,8 +114,7 @@ export const api = {
   },
 
   async checkHealth(): Promise<{ status: string; scheduler_running: boolean; timestamp: string }> {
-    // /health lives at the backend root, next to /api/v1 (works for relative and absolute API_BASE)
-    const res = await fetch(`${API_BASE.replace(/\/api\/v1\/?$/, '')}/health`);
+    const res = await fetch(`${BACKEND_ORIGIN}/health`);
     return res.json();
   }
 };
