@@ -150,17 +150,22 @@ def pick_item(items: list[dict], url: str, product_name: str) -> Optional[dict]:
     """
     Choose the item for our product from an Actor's results.
     A single item is taken as-is (product-page Actors). From search results,
-    prefer an exact product-ID match in the item's URL, then the closest title;
-    return None rather than guess when nothing matches well.
+    require an exact product-ID match when our URL carries one; only URLs
+    without an ID fall back to the closest title. Return None rather than guess.
     """
     priced = [i for i in items if isinstance(i, dict) and extract_price(i)]
     if len(priced) <= 1:
         return priced[0] if priced else None
 
-    for product_id in product_ids(url):
+    ids = product_ids(url)
+    for product_id in ids:
         for item in priced:
             if product_id in _item_urls(item):
                 return item
+    if ids:
+        # The URL names an exact product and it isn't in the results: a similar
+        # title is usually a different model or pack size, so don't guess.
+        return None
 
     wanted = _title_tokens(product_name)
     if not wanted:
