@@ -52,17 +52,16 @@ async def test_corrections_are_recorded_on_the_decision(monkeypatch):
     monkeypatch.setattr(agent, "_get_client", lambda: InconsistentLLM)
 
     product = SimpleNamespace(
-        id="p2", name="Crompton Fan", category="Home",
-        cost_price=2200.0, current_price=3999.0, min_price=2699.0, max_price=5499.0,
-        inventory_count=18, inventory_threshold=8, competitor_urls=[],
+        id="p2", name="boAt Headphones", category="Electronics",
+        cost_price=800.0, current_price=1499.0, min_price=999.0, max_price=2199.0,
+        inventory_count=42, inventory_threshold=10, competitor_urls=[],
     )
     decision, tokens = await agent.run_pricing_for_product(product, "run-2")
 
     assert decision.llm_price == 1740
-    assert decision.new_price == 3199  # 3% below ₹1,240 = ₹1,203, then capped at −20%
+    assert decision.new_price == 1203  # 3% below ₹1,240, above the ₹999 floor
     assert decision.adjustments == [
         "COMPETITIVE must undercut the lowest competitor (₹1,240) → set 3% below",
-        "Capped at ±20% change per run",
     ]
     assert tokens == 120
 

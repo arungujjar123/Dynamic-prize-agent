@@ -223,7 +223,8 @@ async def run_pricing_for_product(product: Product, agent_run_id: str):
     # Catch and correct strategy-direction mismatches
     raw_price, correction = enforce_strategy_direction(
         # only undercut prices we actually observed, never simulated ones
-        strategy_str, raw_price, product.current_price, lowest_real_competitor
+        strategy_str, raw_price, product.current_price, lowest_real_competitor,
+        floor_price=max(product.min_price, product.cost_price * (1 + MIN_MARGIN)),
     )
     if correction:
         logger.warning(f"⚠️  {correction}")

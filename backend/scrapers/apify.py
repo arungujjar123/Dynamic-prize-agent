@@ -157,7 +157,7 @@ async def fetch_price(url: str) -> Optional[float]:
     if "error" in sample:
         logger.warning(f"⚠️ Apify {actor} could not scrape this URL: {_preview(sample.get('error'))}")
         return None
-    price_fields = {k: sample[k] for k in ("price", "mrp", "discountAmount", "offers") if k in sample}
+    price_fields = {k: sample[k] for k in ("price", "mrp", "discountAmount", "offers", "availabilityStatus", "inStock") if k in sample}
     logger.warning(
         f"⚠️ Apify {actor} returned {len(items) if isinstance(items, list) else 0} items "
         f"but no price — item keys: {sorted(sample.keys())[:30]}; price fields: {_preview(price_fields)}"

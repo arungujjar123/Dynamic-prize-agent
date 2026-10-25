@@ -75,3 +75,12 @@ def test_describe_guardrail_messages():
 def test_sub_rupee_overshoot_is_not_reported_as_capped():
     # current ₹453, -20% cap = ₹362.40; an LLM price of ₹362 should pass untouched
     assert clamp(362, current_price=453, cost_price=180, min_price=249, max_price=699) == (362, [])
+
+
+def test_competitive_never_undercuts_below_the_floor():
+    # Mamaearth: competitor ₹229, our floor (min price) ₹249
+    assert enforce_strategy_direction("COMPETITIVE", 249, 362, 229, floor_price=249) == (249, None)
+    price, msg = enforce_strategy_direction("COMPETITIVE", 300, 362, 229, floor_price=249)
+    assert price == 249 and "below our floor" in msg
+    # undercut still applies when it stays above the floor
+    assert enforce_strategy_direction("COMPETITIVE", 1100, 1000, 1050, floor_price=920)[0] == round(1050 * 0.97)
