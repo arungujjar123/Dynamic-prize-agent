@@ -131,13 +131,19 @@ def test_pick_item_matches_exact_variant_in_search_results():
     assert apify.pick_item(SEARCH_RESULTS, NOISE_URL, "Noise ColorFit Pro 4 Smartwatch")["price"] == 2899
 
 
-def test_pick_item_falls_back_to_title_and_refuses_bad_matches():
+def test_pick_item_never_guesses_when_url_has_an_id():
+    # production: a placeholder Crompton URL picked a ₹11,014 lookalike by title
     other_url = "https://www.flipkart.com/x/p/itmzzz?pid=NOTINRESULTS"
-    picked = apify.pick_item(SEARCH_RESULTS, other_url, "Noise ColorFit Pro4 Bluetooth Calling TruView Display")
+    assert apify.pick_item(SEARCH_RESULTS, other_url, "Noise ColorFit Pro4 Bluetooth Calling TruView Display") is None
+
+
+def test_pick_item_title_fallback_only_without_ids():
+    no_id_url = "https://www.flipkart.com/search?q=noise"
+    picked = apify.pick_item(SEARCH_RESULTS, no_id_url, "Noise ColorFit Pro4 Bluetooth Calling TruView Display")
     assert picked["price"] in (2999, 2899)
-    assert apify.pick_item(SEARCH_RESULTS, other_url, "Crompton Aura Prime LED Ceiling Fan") is None
+    assert apify.pick_item(SEARCH_RESULTS, no_id_url, "Crompton Aura Prime LED Ceiling Fan") is None
     # a single result (product-page Actors) is taken as-is
-    assert apify.pick_item(SEARCH_RESULTS[:1], other_url, "anything")["price"] == 1899
+    assert apify.pick_item(SEARCH_RESULTS[:1], no_id_url, "anything")["price"] == 1899
 
 
 def test_input_template_fills_query_and_url_safely(monkeypatch):
