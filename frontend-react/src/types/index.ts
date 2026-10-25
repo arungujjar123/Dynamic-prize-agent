@@ -31,6 +31,8 @@ export interface PriceDecision {
   strategy: PricingStrategy | string | null;
   reasoning?: string | null;
   confidence_score?: number | null;
+  llm_price?: number | null;
+  adjustments?: string[];
   applied: boolean;
   created_at: string | null;
 }
@@ -69,6 +71,8 @@ export interface DashboardSummary {
   total_decisions: number;
   recent_runs: number;
   estimated_revenue_impact: number;
+  applied_changes?: number;
+  avg_applied_change_pct?: number | null;
   avg_margin_pct: number;
   low_stock_products: number;
   last_run?: AgentRun | null;

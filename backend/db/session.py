@@ -64,11 +64,42 @@ async def get_db_context():
             raise
 
 
+# create_all() never alters existing tables, so columns added after the first
+# deploy are added here. Each statement must be idempotent.
+_COLUMN_MIGRATIONS = [
+    "ALTER TABLE price_decisions ADD COLUMN IF NOT EXISTS llm_price DOUBLE PRECISION",
+    "ALTER TABLE price_decisions ADD COLUMN IF NOT EXISTS adjustments JSON",
+]
+
+
 async def init_db():
     from backend.db.models import Base
+    from sqlalchemy import text
     async with async_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        for stmt in _COLUMN_MIGRATIONS:
+            await conn.execute(text(stmt))
     logger.info("✅ Database tables initialized")
+
+
+async def reset_demo_data_once(reset_id: str):
+    """Wipe runs, decisions and signals so products get reseeded at their original prices.
+
+    Runs at most once per reset_id (stored in app_settings), so leaving
+    RESET_DEMO_DATA_ID set does not wipe data again on every restart.
+    Set it to a new value to reset again.
+    """
+    from backend.db.models import AgentRun, AppSetting, PriceDecision, DemandSignal, CompetitorPrice, Product
+    from sqlalchemy import delete
+    async with AsyncSessionLocal() as session:
+        done = await session.get(AppSetting, "demo_reset_id")
+        if done and done.value == reset_id:
+            return
+        for model in (PriceDecision, DemandSignal, CompetitorPrice, AgentRun, Product):
+            await session.execute(delete(model))
+        await session.merge(AppSetting(key="demo_reset_id", value=reset_id))
+        await session.commit()
+    logger.warning(f"🗑️  Demo data reset (id={reset_id}) — products will be reseeded at original prices")
 
 
 async def seed_demo_products():

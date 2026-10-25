@@ -221,6 +221,14 @@ export const ProductHistoryModal: React.FC<ProductHistoryModalProps> = ({
                       <span className="ml-2">
                         <PriceDelta pct={d.price_change_pct} />
                       </span>
+                      {d.llm_price != null && (d.adjustments?.length ?? 0) > 0 && (
+                        <div
+                          className="mt-1 text-[10px] font-normal text-amber-300/90"
+                          title={d.adjustments!.join('\n')}
+                        >
+                          AI suggested {formatINR(d.llm_price)} · adjusted by guardrails
+                        </div>
+                      )}
                     </td>
                     <td className="py-2.5 px-3 text-cyan-400">
                       {d.confidence_score ? `${Math.round(d.confidence_score * 100)}%` : '—'}
@@ -229,7 +237,7 @@ export const ProductHistoryModal: React.FC<ProductHistoryModalProps> = ({
                       {d.applied ? (
                         <span className="text-emerald-400 font-semibold">Yes</span>
                       ) : (
-                        <span className="text-slate-500">Simulated</span>
+                        <span className="text-slate-500">No change</span>
                       )}
                     </td>
                   </tr>

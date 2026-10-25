@@ -17,7 +17,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from backend.db.session import init_db, seed_demo_products
+from backend.db.session import init_db, seed_demo_products, reset_demo_data_once
 from backend.routers.api import products_router, decisions_router, agent_router, analytics_router
 from backend.metrics.prometheus import get_metrics_output, active_products_total
 
@@ -42,6 +42,8 @@ async def lifespan(app: FastAPI):
 
     # Initialize DB
     await init_db()
+    if os.getenv("RESET_DEMO_DATA_ID"):
+        await reset_demo_data_once(os.environ["RESET_DEMO_DATA_ID"])
     await seed_demo_products()
 
     # Update active products gauge

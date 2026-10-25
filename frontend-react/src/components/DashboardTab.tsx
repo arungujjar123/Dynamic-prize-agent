@@ -24,6 +24,7 @@ import {
 import { DashboardSummary, DecisionStats, PriceDecision, Product } from '../types';
 import { StrategyBadge, PriceDelta } from './StrategyBadge';
 import { formatINR } from '../utils/format';
+import { DecisionTrail } from './DecisionTrail';
 
 interface DashboardTabProps {
   summary: DashboardSummary | null;
@@ -125,19 +126,21 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
           <div className="mt-1 text-xs text-emerald-500/80">≥ 15% Floor enforced</div>
         </div>
 
-        {/* Revenue Impact */}
+        {/* Average applied price change */}
         <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-slate-900 to-slate-900/60 p-4 border border-slate-800 shadow-sm hover:border-slate-700 transition-all">
           <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-cyan-500 to-blue-500"></div>
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-mono uppercase tracking-wider text-slate-400">Revenue Impact</span>
+            <span className="text-[11px] font-mono uppercase tracking-wider text-slate-400">Avg Price Change</span>
             <IndianRupee className="w-4 h-4 text-cyan-400" />
           </div>
           <div className="mt-3 text-2xl font-bold font-mono text-cyan-300">
-            {summary?.estimated_revenue_impact !== undefined
-              ? `${summary.estimated_revenue_impact >= 0 ? '+' : ''}${formatINR(summary.estimated_revenue_impact)}`
-              : '₹0'}
+            {summary?.avg_applied_change_pct != null
+              ? `${summary.avg_applied_change_pct > 0 ? '+' : ''}${summary.avg_applied_change_pct.toFixed(1)}%`
+              : '—'}
           </div>
-          <div className="mt-1 text-xs text-slate-500">Net price shift benefit</div>
+          <div className="mt-1 text-xs text-slate-500">
+            Across {summary?.applied_changes ?? 0} applied price changes
+          </div>
         </div>
 
         {/* Low Stock Alert */}
@@ -242,12 +245,14 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                       </div>
                     </div>
 
-                    {/* AI Reasoning Preview */}
+                    {/* AI Reasoning */}
                     {d.reasoning && (
-                      <div className="mt-2.5 pt-2 border-t border-slate-800/60 text-xs text-slate-400 font-mono line-clamp-1 italic">
-                        "{d.reasoning}"
+                      <div className="mt-2.5 pt-2 border-t border-slate-800/60 text-xs text-slate-300 leading-relaxed">
+                        <span className="text-slate-500">AI reasoning: </span>
+                        {d.reasoning}
                       </div>
                     )}
+                    <DecisionTrail decision={d} />
 
                     {/* Footer metadata */}
                     <div className="mt-2 flex items-center justify-between text-[10px] text-slate-500 font-mono pt-1">

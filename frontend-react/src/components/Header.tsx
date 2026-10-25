@@ -1,6 +1,7 @@
 import React from 'react';
 import { Play, RefreshCw, Zap, Clock, ExternalLink, Activity, ShieldCheck } from 'lucide-react';
 import { AgentStatus, SchedulerStatus } from '../types';
+import { GRAFANA_URL, PROMETHEUS_URL } from '../services/api';
 
 interface HeaderProps {
   agentStatus: AgentStatus;
@@ -90,10 +91,12 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           )}
 
-          {/* Observability quick links */}
+          {/* Observability quick links — only when the monitoring stack is reachable */}
+          {(PROMETHEUS_URL || GRAFANA_URL) && (
           <div className="hidden md:flex items-center gap-1 bg-slate-900/60 p-1 rounded-lg border border-slate-800">
+            {PROMETHEUS_URL && (
             <a
-              href="http://localhost:9090"
+              href={PROMETHEUS_URL}
               target="_blank"
               rel="noreferrer"
               title="Prometheus Metrics"
@@ -102,8 +105,10 @@ export const Header: React.FC<HeaderProps> = ({
               <Activity className="w-3 h-3 text-cyan-400" />
               <span>Prometheus</span>
             </a>
+            )}
+            {GRAFANA_URL && (
             <a
-              href="http://localhost:3001"
+              href={GRAFANA_URL}
               target="_blank"
               rel="noreferrer"
               title="Grafana Observability Dashboard"
@@ -112,7 +117,9 @@ export const Header: React.FC<HeaderProps> = ({
               <ExternalLink className="w-3 h-3 text-amber-400" />
               <span>Grafana</span>
             </a>
+            )}
           </div>
+          )}
 
           {/* Auto Refresh dropdown */}
           <div className="flex items-center bg-slate-900/80 border border-slate-800 rounded-lg px-2 py-1 text-xs text-slate-300">

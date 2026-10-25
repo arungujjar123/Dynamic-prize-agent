@@ -129,6 +129,10 @@ ALLOWED_ORIGINS=https://your-frontend.example.com
 
 Write endpoints (`POST/PATCH /products`, `POST /agent/run`) require the `X-API-Key` header when `API_KEY` is set. The Streamlit app reads `API_KEY` and the React app reads `VITE_API_KEY` at build time — note that a key baked into a public frontend bundle is visible to anyone, so treat it as a basic gate, not real user auth.
 
+### 🧹 Resetting demo data on a hosted database
+
+When the database is not reachable from your machine (e.g. Render's internal Postgres), set `RESET_DEMO_DATA_ID` to any new value (e.g. `1`) and redeploy. On startup the backend deletes all runs, decisions and signals and reseeds products at their original prices. It runs **once per value**, so restarts don't wipe data again; set a different value to reset again.
+
 ### 🆓 Free LLM options (no OpenAI credits needed)
 
 The agent uses the official `openai` SDK, which reads `OPENAI_BASE_URL`, so any OpenAI-compatible provider works without code changes:

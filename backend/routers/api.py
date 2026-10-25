@@ -160,6 +160,7 @@ def _decision_to_dict(d: PriceDecision) -> dict:
         "price_change_pct": d.price_change_pct,
         "strategy": d.strategy.value if d.strategy else None,
         "reasoning": d.reasoning, "confidence_score": d.confidence_score,
+        "llm_price": d.llm_price, "adjustments": d.adjustments or [],
         "applied": d.applied,
         "created_at": _utc_iso(d.created_at),
     }
@@ -242,12 +243,15 @@ async def dashboard_summary(db: AsyncSession = Depends(get_db)):
     total_revenue_impact = sum(
         (d.new_price - d.old_price) for d in decisions if d.applied
     )
+    applied_changes = [d.price_change_pct for d in decisions if d.applied and d.price_change_pct is not None]
 
     return {
         "active_products": len(products),
         "total_decisions": len(decisions),
         "recent_runs": len([r for r in runs if r.status and r.status.value == "completed"]),
         "estimated_revenue_impact": round(total_revenue_impact, 2),
+        "applied_changes": len(applied_changes),
+        "avg_applied_change_pct": round(sum(applied_changes) / len(applied_changes), 1) if applied_changes else None,
         "avg_margin_pct": round(
             sum(((p.current_price - p.cost_price) / p.current_price * 100) for p in products) / max(len(products), 1),
             1
