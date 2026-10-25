@@ -138,7 +138,7 @@ Amazon.in and Flipkart block plain HTTP scraping, so live prices come from [Apif
 | `APIFY_TOKEN` | — | Enables Apify scraping |
 | `APIFY_AMAZON_ACTOR` | `junglee~amazon-crawler` | Actor for amazon.in URLs (`username~actor-name`) |
 | `APIFY_FLIPKART_ACTOR` | `sourabhbgp~flipkart-product-scraper` | Actor for flipkart.com URLs |
-| `APIFY_AMAZON_INPUT` / `APIFY_FLIPKART_INPUT` | common URL fields | Optional JSON input template; `{url}` is replaced with the product URL |
+| `APIFY_AMAZON_INPUT` / `APIFY_FLIPKART_INPUT` | common URL fields | Optional JSON input template; `{url}` → the product URL, `{query}` → the product name (for search Actors) |
 | `COMPETITOR_CACHE_HOURS` | `6` | Reuse a scraped price for this long before paying for another Actor run |
 | `SIMULATED_DATA_MAX_CHANGE_PERCENT` | `5` | Max price change per run when no live competitor price exists |
 
@@ -146,6 +146,7 @@ How it behaves:
 - **Cost control:** a scraped price is cached per product and site, and a site that returned no price is not retried until the cache window passes. A run therefore costs at most one Actor run per competitor URL every `COMPETITOR_CACHE_HOURS`.
 - **Safety on simulated data:** without a live price, the agent never undercuts a simulated competitor, and changes are capped at ±5% per run, so made-up prices can't walk real prices down to the floor.
 - **Transparency:** each decision stores the competitor prices it used. The dashboard tags each one `live` or `simulated`.
+- **Search Actors:** when an Actor returns several products (search results), the agent picks the one whose URL contains the same product ID as the competitor URL (Flipkart `pid`/`itm…`, Amazon ASIN), else the closest title (≥70% of the product name's words), else no price. Example that works for Flipkart: `APIFY_FLIPKART_ACTOR=zaver.api~flipkart-scraper` with that Actor's input JSON as `APIFY_FLIPKART_INPUT`, its search text replaced by `{query}`.
 - **Product URLs:** set real product pages in *Products → Edit → Competitor URLs*. Changing them clears that product's cached prices.
 - **Debugging:** if an Actor returns data without a recognisable price, the backend logs the item's keys (`Apify … returned N items but no price — item keys: [...]`). Use them to pick another Actor or set an input template.
 

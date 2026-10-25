@@ -269,7 +269,7 @@ async def get_competitor_price(url: str, product_name: str, product_id: Optional
             # don't pay for another Actor run that recently returned no price
             return _simulate_inr_price(url, domain, product_name)
 
-        price = await apify.fetch_price(url)
+        price = await apify.fetch_price(url, product_name)
         if price:
             result = {
                 "competitor_name": domain, "competitor_url": url, "price": price,
