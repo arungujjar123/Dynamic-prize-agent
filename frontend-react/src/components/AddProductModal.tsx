@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, Plus, AlertTriangle, Check, Sparkles } from 'lucide-react';
 import { Product } from '../types';
 import { api } from '../services/api';
+import { formatINR } from '../utils/format';
 
 interface AddProductModalProps {
   onClose: () => void;
@@ -153,7 +154,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ onClose, onSuc
           {/* Pricing Row: Cost, Current Price, Margin */}
           <div className="grid grid-cols-2 gap-3 bg-slate-900/60 p-3 rounded-xl border border-slate-800/80">
             <div className="space-y-1">
-              <label className="text-slate-400">Cost Price ($) *</label>
+              <label className="text-slate-400">Cost Price (₹) *</label>
               <input
                 type="number"
                 step="0.01"
@@ -166,7 +167,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ onClose, onSuc
 
             <div className="space-y-1">
               <div className="flex items-center justify-between">
-                <label className="text-slate-400">Current Price ($) *</label>
+                <label className="text-slate-400">Current Price (₹) *</label>
                 <span className={`font-bold ${isBelowFloor ? 'text-rose-400' : 'text-emerald-400'}`}>
                   {calculatedMargin.toFixed(1)}% Margin
                 </span>
@@ -185,14 +186,14 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ onClose, onSuc
           {isBelowFloor && (
             <div className="p-2 rounded bg-rose-950/40 border border-rose-800/40 text-[11px] text-rose-300 flex items-center gap-1.5">
               <AlertTriangle className="w-3.5 h-3.5 text-rose-400" />
-              <span>Warning: Margin is below 15% floor (${(costPrice * 1.15).toFixed(2)}). Agent will auto-correct.</span>
+              <span>Warning: Margin is below 15% floor ({formatINR(costPrice * 1.15)}). Agent will auto-correct.</span>
             </div>
           )}
 
           {/* Bounds: Min Price & Max Price */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <label className="text-slate-400">Min Price Floor ($)</label>
+              <label className="text-slate-400">Min Price Floor (₹)</label>
               <input
                 type="number"
                 step="0.01"
@@ -203,7 +204,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ onClose, onSuc
               />
             </div>
             <div className="space-y-1">
-              <label className="text-slate-400">Max Price Ceiling ($)</label>
+              <label className="text-slate-400">Max Price Ceiling (₹)</label>
               <input
                 type="number"
                 step="0.01"

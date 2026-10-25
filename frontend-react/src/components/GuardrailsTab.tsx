@@ -30,36 +30,36 @@ export const GuardrailsTab: React.FC<GuardrailsTabProps> = ({ schedulerStatus })
       name: 'Surge Pricing',
       icon: '🔥',
       color: 'border-red-800/40 bg-red-950/20 text-red-300',
-      condition: 'Demand > 1.5× baseline & Inventory < 20% threshold',
-      action: 'Increases price by +8% to +20% to maximize gross profit per unit.',
+      condition: 'Demand score > 0.7 & inventory at or below low-stock threshold',
+      action: 'Raises price by 5–15% to maximize gross profit per unit.',
     },
     {
       name: 'Competitive Matching',
       icon: '⚔️',
       color: 'border-blue-800/40 bg-blue-950/20 text-blue-300',
-      condition: 'Competitor lower than store price & store margin allows',
-      action: 'Undercuts or matches competitor by 2–5% while guarding minimum margin floor.',
+      condition: 'Normal stock & competitor prices available',
+      action: 'Prices 2–5% below the lowest competitor while guarding the margin floor.',
     },
     {
       name: 'Clearance Discount',
       icon: '🏷️',
       color: 'border-emerald-800/40 bg-emerald-950/20 text-emerald-300',
-      condition: 'Inventory > 2× threshold & velocity < 0.5 units/day',
-      action: 'Gradually reduces price by 5–15% to clear capital and reduce holding cost.',
+      condition: 'Very high inventory (> 50 units in a slow category) or sell-through < 0.2',
+      action: 'Lowers price by 5–15% to clear capital and reduce holding cost.',
     },
     {
       name: 'Demand-Based',
       icon: '📈',
       color: 'border-purple-800/40 bg-purple-950/20 text-purple-300',
-      condition: 'Cart additions / pageviews surging above 7-day average',
-      action: 'Adjusts price upward by +3% to +10% testing customer price elasticity.',
+      condition: 'Demand score 0.4–0.7 with normal inventory',
+      action: 'Moves price up or down in line with the demand level.',
     },
     {
       name: 'Cost-Plus',
       icon: '💰',
       color: 'border-amber-800/40 bg-amber-950/20 text-amber-300',
-      condition: 'Default fallback or zero external demand signals available',
-      action: 'Guarantees standard target margin (Cost Price × 1.25).',
+      condition: 'Last resort when no other strategy fits',
+      action: 'Targets Cost Price × 1.40. If the LLM is unavailable, the current price is held instead.',
     },
   ];
 
@@ -67,7 +67,7 @@ export const GuardrailsTab: React.FC<GuardrailsTabProps> = ({ schedulerStatus })
     {
       title: 'Margin Floor Guardrail',
       formula: 'Price ≥ Cost Price × 1.15',
-      desc: 'No AI decision can ever set a price below a 15% gross profit margin. Enforced strictly at the Python validation layer.',
+      desc: 'No AI decision can set a price below cost + 15% or the product\'s min price. These floors are applied last, after every other rule.',
       status: 'Active & Verified',
     },
     {
@@ -79,7 +79,7 @@ export const GuardrailsTab: React.FC<GuardrailsTabProps> = ({ schedulerStatus })
     {
       title: 'Strategy-Direction Auto Correction',
       formula: 'Direction Validator (LLM Overrule)',
-      desc: 'If OpenAI selects SURGE strategy but outputs a price decrease, the agent engine immediately overrules LLM and increases price by +8%.',
+      desc: 'If the LLM picks SURGE without raising the price, the agent sets +8%; CLEARANCE without lowering → −8%; COMPETITIVE above the lowest competitor → 3% below it.',
       status: 'Active & Verified',
     },
   ];

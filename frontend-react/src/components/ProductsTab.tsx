@@ -14,6 +14,7 @@ import {
   Plus
 } from 'lucide-react';
 import { Product } from '../types';
+import { formatINR } from '../utils/format';
 
 interface ProductsTabProps {
   products: Product[];
@@ -224,19 +225,19 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({
 
                   {/* Cost Price */}
                   <td className="py-3.5 px-4 font-mono text-slate-400">
-                    ${p.cost_price.toFixed(2)}
+                    {formatINR(p.cost_price)}
                   </td>
 
                   {/* Current Price */}
                   <td className="py-3.5 px-4 font-mono font-bold text-sm text-blue-400">
-                    ${p.current_price.toFixed(2)}
+                    {formatINR(p.current_price)}
                   </td>
 
                   {/* Bounds */}
                   <td className="py-3.5 px-4 font-mono text-[11px] text-slate-500">
-                    <span>${p.min_price.toFixed(2)}</span>
+                    <span>{formatINR(p.min_price)}</span>
                     <span className="mx-1 text-slate-600">—</span>
-                    <span>${p.max_price.toFixed(2)}</span>
+                    <span>{formatINR(p.max_price)}</span>
                   </td>
 
                   {/* Gross Margin */}

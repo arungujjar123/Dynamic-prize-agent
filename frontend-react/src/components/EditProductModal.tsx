@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Save, AlertTriangle, ShieldCheck, Check } from 'lucide-react';
 import { Product } from '../types';
 import { api } from '../services/api';
+import { formatINR } from '../utils/format';
 
 interface EditProductModalProps {
   product: Product | null;
@@ -93,13 +94,13 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
           {/* Static Info: Cost Price */}
           <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-800/80 flex items-center justify-between text-xs font-mono">
             <span className="text-slate-400">Fixed Cost Price:</span>
-            <span className="text-slate-200 font-bold">${product.cost_price.toFixed(2)}</span>
+            <span className="text-slate-200 font-bold">{formatINR(product.cost_price)}</span>
           </div>
 
           {/* Current Price & Live Margin */}
           <div className="space-y-1.5">
             <label className="text-xs font-mono text-slate-300 flex items-center justify-between">
-              <span>Current Price ($)</span>
+              <span>Current Price (₹)</span>
               <span
                 className={`font-semibold ${
                   isBelowFloor ? 'text-rose-400' : calculatedMargin > 30 ? 'text-emerald-400' : 'text-amber-400'
@@ -122,7 +123,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
           {isBelowFloor && (
             <div className="p-2.5 rounded-lg bg-rose-950/40 border border-rose-800/40 text-[11px] text-rose-300 flex items-center gap-2 font-mono">
               <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
-              <span>Warning: Margin is below the 15% guardrail floor (${(product.cost_price * 1.15).toFixed(2)}).</span>
+              <span>Warning: Margin is below the 15% guardrail floor ({formatINR(product.cost_price * 1.15)}).</span>
             </div>
           )}
 
@@ -136,7 +137,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
           {/* Min & Max Price Row */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <label className="text-xs font-mono text-slate-400">Min Allowed Price ($)</label>
+              <label className="text-xs font-mono text-slate-400">Min Allowed Price (₹)</label>
               <input
                 type="number"
                 step="0.01"
@@ -147,7 +148,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-mono text-slate-400">Max Allowed Price ($)</label>
+              <label className="text-xs font-mono text-slate-400">Max Allowed Price (₹)</label>
               <input
                 type="number"
                 step="0.01"

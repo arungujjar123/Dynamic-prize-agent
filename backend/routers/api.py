@@ -28,6 +28,11 @@ async def require_api_key(x_api_key: Optional[str] = Header(default=None)):
         raise HTTPException(status_code=401, detail="Invalid or missing X-API-Key")
 
 
+def _utc_iso(dt: Optional[datetime]) -> Optional[str]:
+    """DB timestamps are naive UTC; mark them as UTC so browsers convert to local time"""
+    return dt.isoformat() + "Z" if dt else None
+
+
 # ── Pydantic Schemas ──────────────────────────────────────────────────────────
 
 class ProductCreate(BaseModel):
@@ -109,7 +114,7 @@ def _product_to_dict(p: Product) -> dict:
         "inventory_count": p.inventory_count, "inventory_threshold": p.inventory_threshold,
         "is_active": p.is_active, "competitor_urls": p.competitor_urls or [],
         "gross_margin_pct": round(margin, 1),
-        "updated_at": p.updated_at.isoformat() if p.updated_at else None,
+        "updated_at": _utc_iso(p.updated_at),
     }
 
 
@@ -156,7 +161,7 @@ def _decision_to_dict(d: PriceDecision) -> dict:
         "strategy": d.strategy.value if d.strategy else None,
         "reasoning": d.reasoning, "confidence_score": d.confidence_score,
         "applied": d.applied,
-        "created_at": d.created_at.isoformat() if d.created_at else None,
+        "created_at": _utc_iso(d.created_at),
     }
 
 
@@ -215,8 +220,8 @@ def _run_to_dict(r: AgentRun) -> dict:
         "decisions_made": r.decisions_made, "prices_updated": r.prices_updated,
         "errors": r.errors or [], "total_tokens_used": r.total_tokens_used,
         "duration_seconds": r.duration_seconds, "triggered_by": r.triggered_by,
-        "started_at": r.started_at.isoformat() if r.started_at else None,
-        "completed_at": r.completed_at.isoformat() if r.completed_at else None,
+        "started_at": _utc_iso(r.started_at),
+        "completed_at": _utc_iso(r.completed_at),
     }
 
 

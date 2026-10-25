@@ -108,9 +108,10 @@ dynamic-pricing-agent/
 Copy `.env.example` to `.env` and fill in your values:
 
 ```env
-# Required
+# Required — any OpenAI-compatible LLM API works
 OPENAI_API_KEY=sk-your-key-here
 OPENAI_MODEL=gpt-4o
+# OPENAI_BASE_URL=            # leave unset for OpenAI; see "Free LLM options" below
 
 # Database (change host to 'postgres' when using Docker)
 DATABASE_URL=postgresql+asyncpg://pricing_user:pricing_pass@localhost:5432/pricing_db
@@ -127,6 +128,17 @@ ALLOWED_ORIGINS=https://your-frontend.example.com
 ```
 
 Write endpoints (`POST/PATCH /products`, `POST /agent/run`) require the `X-API-Key` header when `API_KEY` is set. The Streamlit app reads `API_KEY` and the React app reads `VITE_API_KEY` at build time — note that a key baked into a public frontend bundle is visible to anyone, so treat it as a basic gate, not real user auth.
+
+### 🆓 Free LLM options (no OpenAI credits needed)
+
+The agent uses the official `openai` SDK, which reads `OPENAI_BASE_URL`, so any OpenAI-compatible provider works without code changes:
+
+| Provider | `OPENAI_API_KEY` | `OPENAI_BASE_URL` | `OPENAI_MODEL` (example) |
+|---|---|---|---|
+| Google Gemini | key from aistudio.google.com | `https://generativelanguage.googleapis.com/v1beta/openai/` | `gemini-3.1-flash-lite` |
+| Groq | key from console.groq.com | `https://api.groq.com/openai/v1` | `llama-3.3-70b-versatile` |
+
+Model names change often — check the provider's model list, and pick one whose free daily request limit covers your schedule (each run makes one call per active product).
 
 ### 🧪 Tests
 

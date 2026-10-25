@@ -3,7 +3,7 @@ import {
   Package, 
   TrendingUp, 
   Percent, 
-  DollarSign, 
+  IndianRupee, 
   AlertTriangle, 
   ArrowRight,
   ShieldCheck,
@@ -23,6 +23,7 @@ import {
 } from 'recharts';
 import { DashboardSummary, DecisionStats, PriceDecision, Product } from '../types';
 import { StrategyBadge, PriceDelta } from './StrategyBadge';
+import { formatINR } from '../utils/format';
 
 interface DashboardTabProps {
   summary: DashboardSummary | null;
@@ -129,12 +130,12 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
           <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-cyan-500 to-blue-500"></div>
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-mono uppercase tracking-wider text-slate-400">Revenue Impact</span>
-            <DollarSign className="w-4 h-4 text-cyan-400" />
+            <IndianRupee className="w-4 h-4 text-cyan-400" />
           </div>
           <div className="mt-3 text-2xl font-bold font-mono text-cyan-300">
             {summary?.estimated_revenue_impact !== undefined
-              ? `${summary.estimated_revenue_impact >= 0 ? '+' : ''}₹${summary.estimated_revenue_impact.toFixed(0)}`
-              : '$0'}
+              ? `${summary.estimated_revenue_impact >= 0 ? '+' : ''}${formatINR(summary.estimated_revenue_impact)}`
+              : '₹0'}
           </div>
           <div className="mt-1 text-xs text-slate-500">Net price shift benefit</div>
         </div>
@@ -222,7 +223,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                           {product?.cost_price && (
                             <>
                               <span>•</span>
-                              <span>Cost: ${product.cost_price.toFixed(2)}</span>
+                              <span>Cost: {formatINR(product.cost_price)}</span>
                             </>
                           )}
                         </div>
@@ -232,9 +233,9 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                       <div className="flex items-center sm:justify-end gap-3 font-mono">
                         <div className="text-right">
                           <div className="flex items-center gap-2">
-                            <span className="text-xs text-slate-500 line-through">${d.old_price.toFixed(2)}</span>
+                            <span className="text-xs text-slate-500 line-through">{formatINR(d.old_price)}</span>
                             <ArrowRight className="w-3 h-3 text-slate-600" />
-                            <span className="text-sm font-bold text-blue-400">${d.new_price.toFixed(2)}</span>
+                            <span className="text-sm font-bold text-blue-400">{formatINR(d.new_price)}</span>
                             <PriceDelta pct={changePct} />
                           </div>
                         </div>
